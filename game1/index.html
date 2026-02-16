@@ -2,123 +2,145 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Breakout Game</title>
     <style>
-        body {
-            margin: 0;
-            padding: 0;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            background-color: #fce4ec;
-            overflow: hidden;
-            font-family: sans-serif;
-        }
         canvas {
-            background: #ffffff;
+            background: #eee;
             display: block;
-            box-shadow: 0 0 20px rgba(0,0,0,0.1);
-            max-width: 95vw;
-            max-height: 70vh;
-            width: auto;
-            height: auto;
-            touch-action: none;
-        }
-        .instruction {
-            margin-top: 20px;
-            color: #ad1457;
-            font-weight: bold;
+            margin: 0 auto;
         }
     </style>
 </head>
-<body onclick="handleGlobalClick()" ontouchstart="handleGlobalClick()">
+<body onclick="location.reload()">
 
 <canvas id="myCanvas" width="480" height="320"></canvas>
-<div id="msg" class="instruction">パドルを動かしてボールを打ち返そう！</div>
 
 <script>
-    const canvas = document.getElementById("myCanvas");
-    const ctx = canvas.getContext("2d");
-    const msgDiv = document.getElementById("msg");
+    var canvas = document.getElementById("myCanvas");
+    var ctx = canvas.getContext("2d");
+    var ballRadius = 10;
+    var x = canvas.width / 2;
+    var y = canvas.height - 30;
+    var dx = 2;
+    var dy = -2;
+    var paddleHeight = 10;
+    var paddleWidth = 75;
+    var paddleX = (canvas.width - paddleWidth) / 2;
+    var rightPressed = false;
+    var leftPressed = false;
+    var brickRowCount = 3;
+    var brickColumnCount = 5;
+    var brickWidth = 75;
+    var brickHeight = 20;
+    var brickPadding = 10;
+    var brickOffsetTop = 30;
+    var brickOffsetLeft = 30;
+    var score = 0;
 
-    let ballRadius = 10;
-    let x, y, dx, dy, paddleX, score, gameState;
-    const paddleHeight = 10;
-    const paddleWidth = 75;
-    const brickRowCount = 3;
-    const brickColumnCount = 5;
-    const brickWidth = 75;
-    const brickHeight = 20;
-    const brickPadding = 10;
-    const brickOffsetTop = 30;
-    const brickOffsetLeft = 30;
+    var bricks = [];
+    for (var c = 0; c < brickColumnCount; c++) {
+        bricks[c] = [];
+        for (var r = 0; r < brickRowCount; r++) {
+            bricks[c][r] = { x: 0, y: 0, status: 1 };
+        }
+    }
 
-    let bricks = [];
-    const winImage = new Image();
+    var winImage = new Image();
     winImage.src = 'Image.png';
-    const gameOverImage = new Image();
+
+    var gameOverImage = new Image();
     gameOverImage.src = 'Miss.png';
 
-    function initGame() {
-        x = canvas.width / 2;
-        y = canvas.height - 30;
-        dx = 2;
-        dy = -2;
-        paddleX = (canvas.width - paddleWidth) / 2;
-        score = 0;
-        gameState = "playing";
-        msgDiv.innerText = "パドルを動かしてボールを打ち返そう！";
-        for (let c = 0; c < brickColumnCount; c++) {
-            bricks[c] = [];
-            for (let r = 0; r < brickRowCount; r++) {
-                bricks[c][r] = { x: 0, y: 0, status: 1 };
-            }
+    var isGameOver = false;
+    var isWin = false;
+
+    document.addEventListener("keydown", keyDownHandler, false);
+    document.addEventListener("keyup", keyUpHandler, false);
+    document.addEventListener("mousemove", mouseMoveHandler, false);
+    document.addEventListener("touchstart", touchHandler, {passive: false});
+    document.addEventListener("touchmove", touchHandler, {passive: false});
+
+    function keyDownHandler(e) {
+        if (e.key == "Right" || e.key == "ArrowRight") {
+            rightPressed = true;
+        } else if (e.key == "Left" || e.key == "ArrowLeft") {
+            leftPressed = true;
         }
     }
 
-    // 画面全体のどこかを触った時の処理
-    function handleGlobalClick() {
-        if (gameState !== "playing") {
-            initGame();
-            draw();
+    function keyUpHandler(e) {
+        if (e.key == "Right" || e.key == "ArrowRight") {
+            rightPressed = false;
+        } else if (e.key == "Left" || e.key == "ArrowLeft") {
+            leftPressed = false;
         }
     }
 
-    // パドル操作（マウス）
-    document.addEventListener("mousemove", (e) => {
-        const rect = canvas.getBoundingClientRect();
-        const relativeX = (e.clientX - rect.left) * (canvas.width / rect.width);
+    function mouseMoveHandler(e) {
+        var relativeX = e.clientX - canvas.offsetLeft;
         if (relativeX > 0 && relativeX < canvas.width) {
             paddleX = relativeX - paddleWidth / 2;
         }
-    }, false);
+    }
 
-    // パドル操作（タッチ）
-    canvas.addEventListener("touchmove", (e) => {
+    function touchHandler(e) {
         e.preventDefault();
-        const touch = e.touches[0];
-        const rect = canvas.getBoundingClientRect();
-        const touchX = (touch.clientX - rect.left) * (canvas.width / rect.width);
-        paddleX = touchX - paddleWidth / 2;
-    }, {passive: false});
+        var touch = e.touches[0];
+        var rect = canvas.getBoundingClientRect();
+        var touchX = (touch.clientX - rect.left) * (canvas.width / rect.width);
+        if (touchX > 0 && touchX < canvas.width) {
+            paddleX = touchX - paddleWidth / 2;
+        }
+    }
 
     function collisionDetection() {
-        for (let c = 0; c < brickColumnCount; c++) {
-            for (let r = 0; r < brickRowCount; r++) {
-                const b = bricks[c][r];
-                if (b.status === 1) {
+        for (var c = 0; c < brickColumnCount; c++) {
+            for (var r = 0; r < brickRowCount; r++) {
+                var b = bricks[c][r];
+                if (b.status == 1) {
                     if (x > b.x && x < b.x + brickWidth && y > b.y && y < b.y + brickHeight) {
                         dy = -dy;
                         b.status = 0;
                         score++;
-                        if (score === brickRowCount * brickColumnCount) {
-                            gameState = "win";
-                            msgDiv.innerText = "CLEAR! 画面をタップしてリスタート";
+                        if (score == brickRowCount * brickColumnCount) {
+                            isWin = true;
                         }
                     }
+                }
+            }
+        }
+    }
+
+    function drawBall() {
+        ctx.beginPath();
+        ctx.arc(x, y, ballRadius, 0, Math.PI * 2);
+        ctx.fillStyle = "#0095DD";
+        ctx.fill();
+        ctx.closePath();
+    }
+
+    function drawPaddle() {
+        ctx.beginPath();
+        ctx.rect(paddleX, canvas.height - paddleHeight, paddleWidth, paddleHeight);
+        ctx.fillStyle = "#0095DD";
+        ctx.fill();
+        ctx.closePath();
+    }
+
+    function drawBricks() {
+        for (var c = 0; c < brickColumnCount; c++) {
+            for (var r = 0; r < brickRowCount; r++) {
+                if (bricks[c][r].status == 1) {
+                    var brickX = (c * (brickWidth + brickPadding)) + brickOffsetLeft;
+                    var brickY = (r * (brickHeight + brickPadding)) + brickOffsetTop;
+                    bricks[c][r].x = brickX;
+                    bricks[c][r].y = brickY;
+                    ctx.beginPath();
+                    ctx.rect(brickX, brickY, brickWidth, brickHeight);
+                    ctx.fillStyle = "#0095DD";
+                    ctx.fill();
+                    ctx.closePath();
                 }
             }
         }
@@ -127,55 +149,46 @@
     function draw() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-        if (gameState === "playing") {
-            // ブロック描画
-            for (let c = 0; c < brickColumnCount; c++) {
-                for (let r = 0; r < brickRowCount; r++) {
-                    if (bricks[c][r].status === 1) {
-                        const brickX = c * (brickWidth + brickPadding) + brickOffsetLeft;
-                        const brickY = r * (brickHeight + brickPadding) + brickOffsetTop;
-                        bricks[c][r].x = brickX;
-                        bricks[c][r].y = brickY;
-                        ctx.fillStyle = "#f06292";
-                        ctx.fillRect(brickX, brickY, brickWidth, brickHeight);
-                    }
-                }
-            }
-            // ボール描画
-            ctx.beginPath();
-            ctx.arc(x, y, ballRadius, 0, Math.PI * 2);
-            ctx.fillStyle = "#ff4081";
-            ctx.fill();
-            ctx.closePath();
-            // パドル描画
-            ctx.fillStyle = "#ad1457";
-            ctx.fillRect(paddleX, canvas.height - paddleHeight, paddleWidth, paddleHeight);
-
-            collisionDetection();
-
-            if (x + dx > canvas.width - ballRadius || x + dx < ballRadius) dx = -dx;
-            if (y + dy < ballRadius) dy = -dy;
-            else if (y + dy > canvas.height - ballRadius) {
-                if (x > paddleX && x < paddleX + paddleWidth) {
-                    dy = -dy;
-                } else {
-                    gameState = "over";
-                    msgDiv.innerText = "GAME OVER... 画面をタップしてリスタート";
-                }
-            }
-            x += dx;
-            y += dy;
-            requestAnimationFrame(draw);
-
-        } else if (gameState === "win") {
+        if (isWin) {
             ctx.drawImage(winImage, 0, 0, canvas.width, canvas.height);
-        } else if (gameState === "over") {
-            ctx.drawImage(gameOverImage, 0, 0, canvas.width, canvas.height);
+            return;
         }
+        if (isGameOver) {
+            ctx.drawImage(gameOverImage, 0, 0, canvas.width, canvas.height);
+            return;
+        }
+
+        drawBricks();
+        drawBall();
+        drawPaddle();
+        collisionDetection();
+
+        if (x + dx > canvas.width - ballRadius || x + dx < ballRadius) {
+            dx = -dx;
+        }
+        if (y + dy < ballRadius) {
+            dy = -dy;
+        } else if (y + dy > canvas.height - ballRadius) {
+            if (x > paddleX && x < paddleX + paddleWidth) {
+                dy = -dy;
+            } else {
+                isGameOver = true;
+            }
+        }
+
+        if (rightPressed && paddleX < canvas.width - paddleWidth) {
+            paddleX += 7;
+        } else if (leftPressed && paddleX > 0) {
+            paddleX -= 7;
+        }
+
+        x += dx;
+        y += dy;
+        requestAnimationFrame(draw);
     }
 
-    initGame();
     draw();
 </script>
+
 </body>
 </html>
