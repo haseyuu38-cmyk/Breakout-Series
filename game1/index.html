@@ -2,52 +2,101 @@
 <html lang="ja">
 <head>
     <meta charset="utf-8" />
-    <title>Breakout Game Series - Game 1</title>
+    <title>Breakout Game Series</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <style>
-        * { padding: 0; margin: 0; }
-        body { background: #eee; font-family: sans-serif; overflow: hidden; }
-        canvas { background: #eee; display: block; margin: 0 auto; }
-        #ui-layer {
-            position: absolute;
-            top: 0;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 480px;
-            height: 320px;
-            pointer-events: none;
+        * { padding: 0; margin: 0; box-sizing: border-box; }
+        body { 
+            background: #fce4ec; 
+            font-family: "Helvetica Neue", Arial, sans-serif; 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center;
+            min-height: 100vh;
+        }
+        /* ゲーム画面のコンテナ */
+        #game-container {
+            width: 100%;
+            max-width: 480px;
+            position: relative;
+            margin-top: 10px;
+        }
+        canvas { 
+            background: #ffffff; 
+            display: block; 
+            width: 100%; 
+            height: auto;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            border-radius: 5px;
+        }
+        /* 操作・メッセージエリア */
+        #ui-area {
+            width: 100%;
+            max-width: 480px;
+            padding: 20px;
             display: flex;
             flex-direction: column;
-            justify-content: center;
             align-items: center;
+            text-align: center;
         }
-        .menu-button {
-            pointer-events: auto;
-            background: rgba(0, 149, 221, 0.8);
+        .message {
+            font-size: 22px;
+            font-weight: bold;
+            color: #ad1457;
+            margin-bottom: 15px;
+            min-height: 30px;
+        }
+        .button-group {
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+            gap: 10px;
+        }
+        .btn {
+            background: #ad1457;
             color: white;
             border: none;
-            padding: 10px 20px;
-            margin: 5px;
-            border-radius: 5px;
+            padding: 15px 0;
+            border-radius: 30px;
             font-size: 18px;
+            font-weight: bold;
             cursor: pointer;
+            width: 100%;
+            box-shadow: 0 4px 0 #78002e;
+            transition: 0.1s;
+            -webkit-tap-highlight-color: transparent;
         }
-        .menu-button:hover { background: #007bb1; }
+        .btn:active {
+            transform: translateY(3px);
+            box-shadow: 0 1px 0 #78002e;
+        }
+        .timer {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(255, 255, 255, 0.7);
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-weight: bold;
+            color: #333;
+        }
     </style>
 </head>
 <body>
 
-<canvas id="myCanvas" width="480" height="320"></canvas>
-<div id="ui-layer">
-    <div id="start-screen" style="display: flex;">
-        <button class="menu-button" onclick="startGame()">TAP TO START</button>
-    </div>
-    <div id="miss-screen" style="display: none; flex-direction: column;">
-        <button class="menu-button" onclick="continueGame()">CONTINUE</button>
-        <button class="menu-button" onclick="restartGame()">RESTART</button>
-    </div>
-    <div id="win-screen" style="display: none; flex-direction: column;">
-        <h2 style="color: #ff4081; margin-bottom: 10px; -webkit-text-stroke: 1px white;">おめでとう〜♪</h2>
-        <button class="menu-button" onclick="restartGame()">RESTART</button>
+<div id="game-container">
+    <canvas id="myCanvas" width="480" height="320"></canvas>
+    <div id="timer-display" class="timer">TIME: 00:00</div>
+</div>
+
+<div id="ui-area">
+    <div id="status-msg" class="message">TAP TO START</div>
+    
+    <div id="button-area" class="button-group">
+        <button id="start-btn" class="btn" onclick="startGame()">START GAME</button>
+        
+        <button id="continue-btn" class="btn" style="display:none;" onclick="continueGame()">CONTINUE</button>
+        <button id="restart-btn" class="btn" style="display:none;" onclick="restartGame()">RESTART</button>
     </div>
 </div>
 
@@ -55,10 +104,11 @@
     var canvas = document.getElementById("myCanvas");
     var ctx = canvas.getContext("2d");
     
-    // UI要素
-    var startScreen = document.getElementById("start-screen");
-    var missScreen = document.getElementById("miss-screen");
-    var winScreen = document.getElementById("win-screen");
+    var statusMsg = document.getElementById("status-msg");
+    var startBtn = document.getElementById("start-btn");
+    var continueBtn = document.getElementById("continue-btn");
+    var restartBtn = document.getElementById("restart-btn");
+    var timerDisplay = document.getElementById("timer-display");
 
     var ballRadius = 10;
     var x, y, dx, dy, paddleX, score, startTime, totalPausedTime, pauseStartedAt;
@@ -77,7 +127,7 @@
     var winImage = new Image(); winImage.src = 'Image.png';
     var gameOverImage = new Image(); gameOverImage.src = 'Miss.png';
 
-    var gameState = "waiting"; // waiting, playing, miss, win
+    var gameState = "waiting"; 
     var currentTimeStr = "00:00";
 
     function initVariables() {
@@ -97,30 +147,32 @@
         }
     }
 
-    // 操作設定
+    // パドル操作
     document.addEventListener("mousemove", mouseMoveHandler, false);
     document.addEventListener("touchmove", touchHandler, {passive: false});
 
     function mouseMoveHandler(e) {
-        var relativeX = e.clientX - canvas.offsetLeft;
+        var rect = canvas.getBoundingClientRect();
+        var relativeX = (e.clientX - rect.left) * (canvas.width / rect.width);
         if(relativeX > 0 && relativeX < canvas.width) {
             paddleX = relativeX - paddleWidth/2;
         }
     }
     function touchHandler(e) {
         e.preventDefault();
-        var relativeX = e.touches[0].clientX - canvas.offsetLeft;
+        var rect = canvas.getBoundingClientRect();
+        var relativeX = (e.touches[0].clientX - rect.left) * (canvas.width / rect.width);
         if(relativeX > 0 && relativeX < canvas.width) {
             paddleX = relativeX - paddleWidth/2;
         }
     }
 
-    // ゲーム制御関数
     function startGame() {
         initVariables();
         startTime = Date.now();
         gameState = "playing";
-        startScreen.style.display = "none";
+        startBtn.style.display = "none";
+        statusMsg.innerText = "打ち返して！";
         draw();
     }
 
@@ -129,10 +181,11 @@
         y = canvas.height-30;
         dx = 2;
         dy = -2;
-        // 停止時間を計算に加える
         totalPausedTime += (Date.now() - pauseStartedAt);
         gameState = "playing";
-        missScreen.style.display = "none";
+        continueBtn.style.display = "none";
+        restartBtn.style.display = "none";
+        statusMsg.innerText = "打ち返して！";
     }
 
     function restartGame() {
@@ -145,6 +198,7 @@
             var secs = Math.floor(msec / 1000);
             var mins = Math.floor(secs / 60);
             currentTimeStr = (mins < 10 ? "0" + mins : mins) + ":" + (secs % 60 < 10 ? "0" + (secs % 60) : (secs % 60));
+            timerDisplay.innerText = "TIME: " + currentTimeStr;
         }
     }
 
@@ -152,7 +206,7 @@
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
         if(gameState === "playing") {
-            // ブロック描画
+            // ブロック
             for(var c=0; c<brickColumnCount; c++) {
                 for(var r=0; r<brickRowCount; r++) {
                     if(bricks[c][r].status == 1) {
@@ -160,33 +214,22 @@
                         var brickY = (r*(brickHeight+brickPadding))+brickOffsetTop;
                         bricks[c][r].x = brickX;
                         bricks[c][r].y = brickY;
-                        ctx.beginPath();
-                        ctx.rect(brickX, brickY, brickWidth, brickHeight);
-                        ctx.fillStyle = "#0095DD";
-                        ctx.fill();
-                        ctx.closePath();
+                        ctx.fillStyle = "#f06292";
+                        ctx.fillRect(brickX, brickY, brickWidth, brickHeight);
                     }
                 }
             }
-
-            // ボール・パドル
+            // ボール
             ctx.beginPath();
             ctx.arc(x, y, ballRadius, 0, Math.PI*2);
-            ctx.fillStyle = "#0095DD";
+            ctx.fillStyle = "#ff4081";
             ctx.fill();
             ctx.closePath();
+            // パドル
+            ctx.fillStyle = "#ad1457";
+            ctx.fillRect(paddleX, canvas.height-paddleHeight, paddleWidth, paddleHeight);
 
-            ctx.beginPath();
-            ctx.rect(paddleX, canvas.height-paddleHeight, paddleWidth, paddleHeight);
-            ctx.fillStyle = "#0095DD";
-            ctx.fill();
-            ctx.closePath();
-
-            // タイム表示
             updateTimer();
-            ctx.font = "16px Arial";
-            ctx.fillStyle = "#0095DD";
-            ctx.fillText("TIME: " + currentTimeStr, 8, 20);
 
             // 衝突判定
             for(var c=0; c<brickColumnCount; c++) {
@@ -197,9 +240,10 @@
                             dy = -dy;
                             b.status = 0;
                             score++;
-                            if(score == brickRowCount*brickColumnCount) {
+                            if(score == brickRowCount * brickColumnCount) {
                                 gameState = "win";
-                                winScreen.style.display = "flex";
+                                statusMsg.innerText = "おめでとう～♪";
+                                restartBtn.style.display = "block";
                             }
                         }
                     }
@@ -214,7 +258,9 @@
                 } else {
                     gameState = "miss";
                     pauseStartedAt = Date.now();
-                    missScreen.style.display = "flex";
+                    statusMsg.innerText = "ざんねん！";
+                    continueBtn.style.display = "block";
+                    restartBtn.style.display = "block";
                 }
             }
             x += dx; y += dy;
