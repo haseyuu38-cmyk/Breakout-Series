@@ -116,7 +116,6 @@
     }
 
     function continueGame() {
-        // 数値をリセット
         x = canvas.width/2;
         y = canvas.height-30;
         dx = 2;
@@ -125,17 +124,14 @@
         gameState = "play";
         missControls.style.display = "none";
         msg.innerText = "がんばって！";
-        
-        // 【重要】止まっていたアニメーションループを再開させる
         draw(); 
     }
 
     function restartGame() { location.reload(); }
 
     function draw() {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        
         if(gameState === "play") {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
             for(var c=0; c<5; c++) {
                 for(var r=0; r<3; r++) {
                     var b = bricks[c][r];
@@ -177,7 +173,9 @@
                     pauseStart = Date.now();
                     msg.innerText = "ざんねん！";
                     missControls.style.display = "block";
-                    return; // ループを止める
+                    // ミスした瞬間に画像を描画する
+                    ctx.drawImage(missImg, 0, 0, 480, 320);
+                    return; 
                 }
             }
             x += dx; y += dy;
@@ -185,7 +183,6 @@
         } 
         else if(gameState === "miss") {
             ctx.drawImage(missImg, 0, 0, 480, 320);
-            // ここでは requestAnimationFrame を呼ばない
         } 
         else if(gameState === "win") {
             ctx.drawImage(winImg, 0, 0, 480, 320);
