@@ -82,7 +82,6 @@
         }
     }
 
-    // パドル操作：ワープを防ぎ、指の動きに合わせて左右に動かす
     function handleMove(currentClientX) {
         if (gameState !== "play") return;
         if (lastTouchX !== null) {
@@ -90,8 +89,6 @@
             var scale = canvas.width / rect.width;
             var movementX = (currentClientX - lastTouchX) * scale;
             paddleX += movementX;
-
-            // 画面外へのはみ出し制限
             if (paddleX < 0) paddleX = 0;
             if (paddleX > canvas.width - paddleWidth) paddleX = canvas.width - paddleWidth;
         }
@@ -119,6 +116,7 @@
     }
 
     function continueGame() {
+        // 数値をリセット
         x = canvas.width/2;
         y = canvas.height-30;
         dx = 2;
@@ -127,6 +125,9 @@
         gameState = "play";
         missControls.style.display = "none";
         msg.innerText = "がんばって！";
+        
+        // 【重要】止まっていたアニメーションループを再開させる
+        draw(); 
     }
 
     function restartGame() { location.reload(); }
@@ -135,7 +136,6 @@
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         
         if(gameState === "play") {
-            // ブロック
             for(var c=0; c<5; c++) {
                 for(var r=0; r<3; r++) {
                     var b = bricks[c][r];
@@ -146,17 +146,13 @@
                     }
                 }
             }
-            // ボール
             ctx.beginPath(); ctx.arc(x, y, ballRadius, 0, Math.PI*2); ctx.fillStyle = "#ff4081"; ctx.fill(); ctx.closePath();
-            // パドル
             ctx.fillStyle = "#ad1457"; ctx.fillRect(paddleX, canvas.height-10, paddleWidth, 10);
 
-            // タイマー
             var msec = Date.now() - startTime - totalPaused;
             var s = Math.floor(msec/1000);
             timerBox.innerText = "TIME: " + Math.floor(s/60).toString().padStart(2,'0') + ":" + (s%60).toString().padStart(2,'0');
 
-            // 衝突判定
             for(var c=0; c<5; c++) {
                 for(var r=0; r<3; r++) {
                     var b = bricks[c][r];
@@ -181,13 +177,19 @@
                     pauseStart = Date.now();
                     msg.innerText = "ざんねん！";
                     missControls.style.display = "block";
+                    return; // ループを止める
                 }
             }
             x += dx; y += dy;
             requestAnimationFrame(draw);
         } 
-        else if(gameState === "miss") ctx.drawImage(missImg, 0, 0, 480, 320);
-        else if(gameState === "win") ctx.drawImage(winImg, 0, 0, 480, 320);
+        else if(gameState === "miss") {
+            ctx.drawImage(missImg, 0, 0, 480, 320);
+            // ここでは requestAnimationFrame を呼ばない
+        } 
+        else if(gameState === "win") {
+            ctx.drawImage(winImg, 0, 0, 480, 320);
+        }
     }
 </script>
 </body>
