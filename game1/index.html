@@ -1,244 +1,199 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-    <meta charset="UTF-8">
+    <meta charset="utf-8" />
+    <title>Breakout Game Series</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Breakout - Speed Up Edition</title>
     <style>
-        body { margin: 0; overflow: hidden; background: #222; font-family: sans-serif; touch-action: none; }
-        canvas { display: block; background: #000; margin: 0 auto; }
-        
-        /* タイム表示 */
-        #timer {
-            position: absolute; top: 10px; left: 50%; transform: translateX(-50%);
-            color: #fff; font-size: 20px; font-weight: bold; z-index: 10;
+        body { 
+            margin: 0; padding: 0; background-color: #fce4ec; 
+            font-family: sans-serif; display: flex; flex-direction: column; 
+            align-items: center; justify-content: center; min-height: 100vh;
+            touch-action: none;
         }
+        #header-area { width: 100%; height: 60px; display: flex; justify-content: center; align-items: center; }
+        #timer-box { background: #ad1457; color: white; padding: 5px 25px; border-radius: 20px; font-weight: bold; font-size: 22px; }
 
-        /* オーバーレイ共通 */
-        .overlay {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.7); display: none;
-            flex-direction: column; align-items: center; justify-content: center; z-index: 20;
+        #canvas-container { width: 95%; max-width: 480px; margin: 10px 0; position: relative; }
+        canvas { background: #ffffff; display: block; width: 100%; height: auto; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+
+        #ui-area { width: 90%; max-width: 480px; text-align: center; }
+        .message { font-size: 20px; font-weight: bold; color: #ad1457; margin-bottom: 10px; height: 30px; }
+        .btn { 
+            display: block; width: 100%; padding: 18px; margin: 10px 0; 
+            background: #ad1457; color: white; border: none; border-radius: 15px; 
+            font-size: 18px; font-weight: bold; box-shadow: 0 4px 0 #78002e;
+            cursor: pointer;
         }
-        .overlay img { max-width: 80%; margin-bottom: 20px; }
-        .message { color: gold; font-size: 30px; margin-bottom: 20px; text-shadow: 2px 2px #000; }
-        
-        button {
-            padding: 15px 30px; font-size: 18px; margin: 10px; cursor: pointer;
-            border-radius: 10px; border: none; background: #fff; font-weight: bold;
-        }
-        #btn-continue { background: #ffeb3b; }
-        #btn-restart { background: #ff5722; color: white; }
-        #btn-start { background: #4caf50; color: white; }
+        .btn:active { transform: translateY(2px); box-shadow: 0 2px 0 #78002e; }
     </style>
 </head>
 <body>
 
-    <div id="timer">TIME: 0.00s</div>
+<div id="header-area">
+    <div id="timer-box">TIME: 00:00</div>
+</div>
 
-    <div id="start-screen" class="overlay" style="display: flex;">
-        <div class="message">TAP TO START</div>
-        <button id="btn-start">ゲーム開始</button>
+<div id="canvas-container">
+    <canvas id="myCanvas" width="480" height="320"></canvas>
+</div>
+
+<div id="ui-area">
+    <div id="msg" class="message">TAP TO START</div>
+    <button id="start-btn" class="btn" onclick="startGame()">ゲームを始める</button>
+    
+    <div id="miss-controls" style="display:none;">
+        <button class="btn" onclick="continueGame()">あきらめない</button>
+        <button class="btn" style="background:#666; box-shadow:0 4px 0 #333;" onclick="restartGame()">最初からやり直す</button>
     </div>
 
-    <div id="miss-screen" class="overlay">
-        <img src="Miss.png" alt="Miss">
-        <button id="btn-continue">あきらめない</button>
-        <button id="btn-restart-miss">最初からやり直す</button>
+    <div id="win-controls" style="display:none;">
+        <h2 style="color:#ad1457; margin-bottom:10px;">おめでとう〜♪</h2>
+        <button class="btn" onclick="restartGame()">もう一度遊ぶ</button>
     </div>
-
-    <div id="clear-screen" class="overlay">
-        <img src="Image.png" alt="Clear">
-        <div class="message">おめでとう〜♪</div>
-        <button id="btn-restart-clear">もう一度遊ぶ</button>
-    </div>
-
-    <canvas id="gameCanvas"></canvas>
+</div>
 
 <script>
-    const canvas = document.getElementById("gameCanvas");
-    const ctx = canvas.getContext("2d");
-    const timerElement = document.getElementById("timer");
+    var canvas = document.getElementById("myCanvas");
+    var ctx = canvas.getContext("2d");
+    var msg = document.getElementById("msg");
+    var timerBox = document.getElementById("timer-box");
+    var startBtn = document.getElementById("start-btn");
+    var missControls = document.getElementById("miss-controls");
+    var winControls = document.getElementById("win-controls");
 
-    // キャンバスサイズ設定
-    canvas.width = window.innerWidth > 480 ? 480 : window.innerWidth;
-    canvas.height = window.innerHeight;
-
-    // ゲーム状態
-    let isRunning = false;
-    let startTime = 0;
-    let elapsedTime = 0;
-    let animationId;
-
-    // ボール設定
-    let ball = { x: 0, y: 0, dx: 4, dy: -4, radius: 8 };
+    var ballRadius = 10;
+    var x, y, dx, dy, paddleX, score, startTime, totalPaused, pauseStart;
     
-    // 【新機能】速度倍率
-    let speedMultiplier = 1.0;
+    // --- 加速機能のための変数 ---
+    var speedMultiplier = 1.0;
     const MAX_SPEED_MULTIPLIER = 2.0; // 最大2倍まで
-    const SPEED_INCREMENT = 0.00015;  // 毎フレームの加速量
+    const SPEED_INCREMENT = 0.00015;  // 加速の緩やかさ
+    
+    var paddleWidth = 75;
+    var bricks = [];
+    var winImg = new Image(); winImg.src = 'Image.png';
+    var missImg = new Image(); missImg.src = 'Miss.png';
+    var gameState = "ready";
+    var lastTouchX = null;
 
-    // パドル設定
-    const paddleHeight = 15;
-    const paddleWidth = 80;
-    let paddleX = (canvas.width - paddleWidth) / 2;
-
-    // ブロック設定
-    const rowCount = 5;
-    const columnCount = 6;
-    const brickPadding = 5;
-    const brickOffsetTop = 60;
-    const brickWidth = (canvas.width - (brickPadding * (columnCount + 1))) / columnCount;
-    const brickHeight = 25;
-    let bricks = [];
-
-    function initBricks() {
-        bricks = [];
-        for(let c=0; c<columnCount; c++) {
+    function init() {
+        x = canvas.width/2; y = canvas.height-30;
+        dx = 2; dy = -2;
+        speedMultiplier = 1.0; // 速度倍率をリセット
+        paddleX = (canvas.width-paddleWidth)/2;
+        score = 0; totalPaused = 0;
+        for(var c=0; c<5; c++) {
             bricks[c] = [];
-            for(let r=0; r<rowCount; r++) {
-                bricks[c][r] = { x: 0, y: 0, status: 1 };
-            }
+            for(var r=0; r<3; r++) { bricks[c][r] = { x: 0, y: 0, status: 1 }; }
         }
     }
 
-    function initBall() {
-        ball.x = canvas.width / 2;
-        ball.y = canvas.height - 50;
-        ball.dx = 4 * (Math.random() > 0.5 ? 1 : -1);
-        ball.dy = -4;
-        speedMultiplier = 1.0; // 速度をリセット
+    function handleMove(currentClientX) {
+        if (gameState !== "play") return;
+        if (lastTouchX !== null) {
+            var rect = canvas.getBoundingClientRect();
+            var scale = canvas.width / rect.width;
+            var movementX = (currentClientX - lastTouchX) * scale;
+            paddleX += movementX;
+            if (paddleX < 0) paddleX = 0;
+            if (paddleX > canvas.width - paddleWidth) paddleX = canvas.width - paddleWidth;
+        }
+        lastTouchX = currentClientX;
     }
 
-    // 操作系（相対移動）
-    document.addEventListener("touchmove", (e) => {
-        e.preventDefault();
-        const touch = e.touches[0];
-        const movementX = touch.clientX - (lastTouchX || touch.clientX);
-        paddleX += movementX;
-        if(paddleX < 0) paddleX = 0;
-        if(paddleX + paddleWidth > canvas.width) paddleX = canvas.width - paddleWidth;
-        lastTouchX = touch.clientX;
-    }, { passive: false });
+    window.addEventListener("mousedown", function(e) { lastTouchX = e.clientX; });
+    window.addEventListener("mousemove", function(e) { if(e.buttons > 0) handleMove(e.clientX); });
+    window.addEventListener("mouseup", function() { lastTouchX = null; });
 
-    let lastTouchX = 0;
-    document.addEventListener("touchstart", (e) => { lastTouchX = e.touches[0].clientX; });
+    window.addEventListener("touchstart", function(e) { lastTouchX = e.touches[0].clientX; }, {passive: false});
+    window.addEventListener("touchmove", function(e) { 
+        e.preventDefault(); 
+        handleMove(e.touches[0].clientX); 
+    }, {passive: false});
+    window.addEventListener("touchend", function() { lastTouchX = null; });
 
-    // 衝突判定
-    function collisionDetection() {
-        for(let c=0; c<columnCount; c++) {
-            for(let r=0; r<rowCount; r++) {
-                let b = bricks[c][r];
-                if(b.status === 1) {
-                    if(ball.x > b.x && ball.x < b.x + brickWidth && ball.y > b.y && ball.y < b.y + brickHeight) {
-                        ball.dy = -ball.dy;
-                        b.status = 0;
-                        checkWin();
+    function startGame() {
+        init();
+        startTime = Date.now();
+        gameState = "play";
+        startBtn.style.display="none";
+        msg.innerText="がんばって！";
+        draw();
+    }
+
+    function continueGame() {
+        x = canvas.width/2;
+        y = canvas.height-30;
+        dx = 2;
+        dy = -2;
+        speedMultiplier = 1.0; // コンテニュー時は速度を元に戻す
+        totalPaused += (Date.now() - pauseStart);
+        gameState = "play";
+        missControls.style.display = "none";
+        msg.innerText = "がんばって！";
+        draw(); 
+    }
+
+    function restartGame() { location.reload(); }
+
+    function draw() {
+        if(gameState === "play") {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // 【追加】時間経過で速度倍率を上げる
+            if (speedMultiplier < MAX_SPEED_MULTIPLIER) {
+                speedMultiplier += SPEED_INCREMENT;
+            }
+
+            for(var c=0; c<5; c++) {
+                for(var r=0; r<3; r++) {
+                    var b = bricks[c][r];
+                    if(b.status == 1) {
+                        var bx = (c*(75+10))+30; var by = (r*(20+10))+30;
+                        b.x = bx; b.y = by;
+                        ctx.fillStyle = "#f06292"; ctx.fillRect(bx, by, 75, 20);
                     }
                 }
             }
-        }
-    }
+            ctx.beginPath(); ctx.arc(x, y, ballRadius, 0, Math.PI*2); ctx.fillStyle = "#ff4081"; ctx.fill(); ctx.closePath();
+            ctx.fillStyle = "#ad1457"; ctx.fillRect(paddleX, canvas.height-10, paddleWidth, 10);
 
-    function checkWin() {
-        const remaining = bricks.flat().filter(b => b.status === 1).length;
-        if(remaining === 0) {
-            isRunning = false;
-            document.getElementById("clear-screen").style.display = "flex";
-        }
-    }
+            var msec = Date.now() - startTime - totalPaused;
+            var s = Math.floor(msec/1000);
+            timerBox.innerText = "TIME: " + Math.floor(s/60).toString().padStart(2,'0') + ":" + (s%60).toString().padStart(2,'0');
 
-    function draw() {
-        if(!isRunning) return;
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-        // ボールの加速処理
-        if (speedMultiplier < MAX_SPEED_MULTIPLIER) {
-            speedMultiplier += SPEED_INCREMENT;
-        }
-
-        // ブロック描画
-        for(let c=0; c<columnCount; c++) {
-            for(let r=0; r<rowCount; r++) {
-                if(bricks[c][r].status === 1) {
-                    let bx = (c * (brickWidth + brickPadding)) + brickPadding;
-                    let by = (r * (brickHeight + brickPadding)) + brickOffsetTop;
-                    bricks[c][r].x = bx;
-                    bricks[c][r].y = by;
-                    ctx.fillStyle = `hsl(${r * 40}, 70%, 50%)`;
-                    ctx.fillRect(bx, by, brickWidth, brickHeight);
+            for(var c=0; c<5; c++) {
+                for(var r=0; r<3; r++) {
+                    var b = bricks[c][r];
+                    if(b.status == 1 && x > b.x && x < b.x+75 && y > b.y && y < b.y+20) {
+                        dy = -dy; b.status = 0; score++;
+                        if(score == 15) { 
+                            gameState = "win"; 
+                            winControls.style.display = "block"; 
+                            msg.style.display = "none"; 
+                        }
+                    }
                 }
             }
-        }
 
-        // パドル描画
-        ctx.fillStyle = "#0095DD";
-        ctx.fillRect(paddleX, canvas.height - paddleHeight - 20, paddleWidth, paddleHeight);
-
-        // ボール描画
-        ctx.beginPath();
-        ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI*2);
-        ctx.fillStyle = "#fff";
-        ctx.fill();
-        ctx.closePath();
-
-        // 移動（倍率適用）
-        ball.x += ball.dx * speedMultiplier;
-        ball.y += ball.dy * speedMultiplier;
-
-        // 壁バウンド
-        if(ball.x + ball.radius > canvas.width || ball.x - ball.radius < 0) ball.dx = -ball.dx;
-        if(ball.y - ball.radius < 0) ball.dy = -ball.dy;
-
-        // パドル判定
-        if(ball.y + ball.radius > canvas.height - paddleHeight - 20) {
-            if(ball.x > paddleX && ball.x < paddleX + paddleWidth) {
-                ball.dy = -Math.abs(ball.dy);
-            } else if(ball.y > canvas.height) {
-                // ミス
-                isRunning = false;
-                document.getElementById("miss-screen").style.display = "flex";
+            if(x + dx > canvas.width-ballRadius || x + dx < ballRadius) dx = -dx;
+            if(y + dy < ballRadius) dy = -dy;
+            else if(y + dy > canvas.height-ballRadius) {
+                if(x > paddleX && x < paddleX + paddleWidth) {
+                    dy = -Math.abs(dy); // 確実に上方向へ跳ね返す
+                } else {
+                    gameState = "miss";
+                    pauseStart = Date.now();
+                    msg.innerText = "ざんねん！";
+                    missControls.style.display = "block";
+                    ctx.drawImage(missImg, 0, 0, 480, 320);
+                    return; 
+                }
             }
-        }
-
-        collisionDetection();
-        updateTimer();
-        animationId = requestAnimationFrame(draw);
-    }
-
-    function updateTimer() {
-        elapsedTime = (Date.now() - startTime) / 1000;
-        timerElement.innerText = `TIME: ${elapsedTime.toFixed(2)}s`;
-    }
-
-    // ボタンイベント
-    document.getElementById("btn-start").onclick = () => {
-        document.getElementById("start-screen").style.display = "none";
-        startGame();
-    };
-
-    document.getElementById("btn-continue").onclick = () => {
-        document.getElementById("miss-screen").style.display = "none";
-        initBall(); // 速度も1.0にリセット
-        isRunning = true;
-        startTime = Date.now() - (elapsedTime * 1000); // タイム再開
-        draw();
-    };
-
-    const restartAll = () => {
-        location.reload();
-    };
-
-    document.getElementById("btn-restart-miss").onclick = restartAll;
-    document.getElementById("btn-restart-clear").onclick = restartAll;
-
-    function startGame() {
-        initBricks();
-        initBall();
-        startTime = Date.now();
-        isRunning = true;
-        draw();
-    }
-</script>
-</body>
-</html>
+            
+            // 【修正】移動量に速度倍率を適用
+            x += dx * speedMultiplier; 
+            y += dy * speedMultiplier;
+            
+            requestAnimationFrame(
