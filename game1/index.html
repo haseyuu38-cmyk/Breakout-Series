@@ -2,19 +2,19 @@
 <html lang="ja">
 <head>
     <meta charset="utf-8" />
-    <title>ちっくゲーム - Breakout</title>
+    <title>ちっくゲーム - Portal</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <style>
         body { 
             margin: 0; padding: 0; background-color: #fce4ec; 
             font-family: sans-serif; display: flex; flex-direction: column; 
             align-items: center; justify-content: center; min-height: 100vh;
-            touch-action: none;
+            touch-action: none; overflow: hidden;
         }
         #header-area { width: 100%; height: 60px; display: flex; justify-content: center; align-items: center; }
         #timer-box { background: #ad1457; color: white; padding: 5px 25px; border-radius: 20px; font-weight: bold; font-size: 22px; }
 
-        #canvas-container { width: 95%; max-width: 480px; margin: 10px 0; position: relative; }
+        #canvas-container { width: 95%; max-width: 480px; margin: 10px 0; position: relative; aspect-ratio: 2/3; }
         canvas { background: #ffffff; display: block; width: 100%; height: auto; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
 
         #ui-area { width: 90%; max-width: 480px; text-align: center; }
@@ -28,30 +28,15 @@
         }
         .btn:active { transform: translateY(2px); box-shadow: 0 2px 0 #78002e; }
 
-        /* タイトル画面 */
-        #title-screen {
+        /* スクリーン共通設定 */
+        .screen-overlay {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background: #fff; z-index: 100; display: flex; flex-direction: column; align-items: center;
+            z-index: 100; display: none; background: #fff;
         }
-        #top-image-container { position: relative; width: 100%; }
-        #top-image { width: 100%; height: auto; display: block; }
+        .full-img { width: 100%; height: 100%; object-fit: contain; display: block; }
         
-        /* 透明なクリック判定（STARTボタン部分） */
-        .hit-area {
-            position: absolute;
-            left: 20%; width: 60%; height: 12%;
-            cursor: pointer;
-            z-index: 105;
-            /* background: rgba(255,0,0,0.3); */ /* デバッグ時に位置を確認したい場合はコメントを外してください */
-        }
-        #start-hit { top: 58%; }
-
-        /* ステージ選択オーバーレイ */
-        #stage-select-overlay {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(255, 255, 255, 0.95); z-index: 110;
-            display: none; flex-direction: column; align-items: center; justify-content: center;
-        }
+        /* 透明なタップ判定エリア */
+        .hit-area { position: absolute; cursor: pointer; z-index: 110; /* background: rgba(255,0,0,0.3); */ }
     </style>
 </head>
 <body>
@@ -61,21 +46,17 @@
 </div>
 
 <div id="canvas-container">
-    <div id="title-screen">
-        <div id="top-image-container">
-            <img src="Top.png" id="top-image" alt="ちっくゲーム">
-            <div id="start-hit" class="hit-area" onclick="showStageSelect()"></div>
-        </div>
+    <div id="top-screen" class="screen-overlay" style="display: block;">
+        <img src="Top.png" class="full-img" alt="Top">
+        <div id="go-select-hit" class="hit-area" style="top: 68%; left: 20%; width: 60%; height: 10%;" onclick="showSelect()"></div>
+    </div>
 
-        <div id="stage-select-overlay">
-            <div class="message">ステージを選んでね</div>
-            <button class="btn" style="background:#ff4081;" onclick="selectStage(1)">ステージ 1 (加速あり)</button>
-            <button class="btn" style="background:#ccc; box-shadow:0 4px 0 #999;" disabled>ステージ 2 (Coming Soon)</button>
-            <button class="btn" style="background:#666; margin-top:20px;" onclick="hideStageSelect()">もどる</button>
-        </div>
+    <div id="select-screen" class="screen-overlay">
+        <img src="Select.png" class="full-img" alt="Select">
+        <div id="start-breakout-hit" class="hit-area" style="top: 30%; left: 15%; width: 70%; height: 10%;" onclick="startBreakout()"></div>
     </div>
     
-    <canvas id="myCanvas" width="480" height="320"></canvas>
+    <canvas id="myCanvas" width="480" height="320" style="display: none;"></canvas>
 </div>
 
 <div id="ui-area">
@@ -97,13 +78,14 @@
     var timerBox = document.getElementById("timer-box");
     var missControls = document.getElementById("miss-controls");
     var winControls = document.getElementById("win-controls");
-    var titleScreen = document.getElementById("title-screen");
-    var stageOverlay = document.getElementById("stage-select-overlay");
+    
+    var topScreen = document.getElementById("top-screen");
+    var selectScreen = document.getElementById("select-screen");
 
     var ballRadius = 10;
     var x, y, dx, dy, paddleX, score, startTime, totalPaused, pauseStart;
     
-    // 加速機能用
+    // 加速機能
     var speedMultiplier = 1.0;
     const MAX_SPEED_MULTIPLIER = 2.0;
     const SPEED_INCREMENT = 0.00015;
@@ -112,8 +94,25 @@
     var bricks = [];
     var winImg = new Image(); winImg.src = 'Image.png';
     var missImg = new Image(); missImg.src = 'Miss.png';
-    var gameState = "title";
+    var gameState = "top";
     var lastTouchX = null;
+
+    // 画面遷移関数
+    function showSelect() {
+        topScreen.style.display = "none";
+        selectScreen.style.display = "block";
+        gameState = "select";
+    }
+
+    function startBreakout() {
+        selectScreen.style.display = "none";
+        canvas.style.display = "block";
+        init();
+        startTime = Date.now();
+        gameState = "play";
+        msg.innerText = "がんばって！";
+        draw();
+    }
 
     function init() {
         x = canvas.width/2; y = canvas.height-30;
@@ -127,22 +126,10 @@
         }
     }
 
-    function showStageSelect() { stageOverlay.style.display = "flex"; }
-    function hideStageSelect() { stageOverlay.style.display = "none"; }
-
-    function selectStage(num) {
-        titleScreen.style.display = "none";
-        init();
-        startTime = Date.now();
-        gameState = "play";
-        msg.innerText = "がんばって！";
-        draw();
-    }
-
     function continueGame() {
         x = canvas.width/2; y = canvas.height-30;
         dx = 2; dy = -2;
-        speedMultiplier = 1.0; // 加速リセット
+        speedMultiplier = 1.0;
         totalPaused += (Date.now() - pauseStart);
         gameState = "play";
         missControls.style.display = "none";
@@ -152,6 +139,7 @@
 
     function restartGame() { location.reload(); }
 
+    // 操作
     function handleMove(currentClientX) {
         if (gameState !== "play") return;
         if (lastTouchX !== null) {
@@ -175,11 +163,7 @@
     function draw() {
         if(gameState === "play") {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-            
-            // 加速ロジック
-            if (speedMultiplier < MAX_SPEED_MULTIPLIER) {
-                speedMultiplier += SPEED_INCREMENT;
-            }
+            if (speedMultiplier < MAX_SPEED_MULTIPLIER) { speedMultiplier += SPEED_INCREMENT; }
 
             for(var c=0; c<5; c++) {
                 for(var r=0; r<3; r++) {
@@ -215,22 +199,17 @@
             if(x + dx > canvas.width-ballRadius || x + dx < ballRadius) dx = -dx;
             if(y + dy < ballRadius) dy = -dy;
             else if(y + dy > canvas.height-ballRadius) {
-                if(x > paddleX && x < paddleX + paddleWidth) {
-                    dy = -Math.abs(dy);
-                } else {
+                if(x > paddleX && x < paddleX + paddleWidth) { dy = -Math.abs(dy); }
+                else {
                     gameState = "miss"; pauseStart = Date.now();
                     msg.innerText = "ざんねん！"; missControls.style.display = "block";
                     ctx.drawImage(missImg, 0, 0, 480, 320); return; 
                 }
             }
-            
             x += dx * speedMultiplier; y += dy * speedMultiplier;
             requestAnimationFrame(draw);
-        } else if(gameState === "miss") {
-            ctx.drawImage(missImg, 0, 0, 480, 320);
-        } else if(gameState === "win") {
-            ctx.drawImage(winImg, 0, 0, 480, 320);
-        }
+        } else if(gameState === "miss") { ctx.drawImage(missImg, 0, 0, 480, 320); } 
+        else if(gameState === "win") { ctx.drawImage(winImg, 0, 0, 480, 320); }
     }
 </script>
 </body>
