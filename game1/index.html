@@ -5,6 +5,7 @@
     <title>ちっくゲーム - Portal</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <style>
+        /* --- 全体レイアウト：CSS独立性を確保 --- */
         body { 
             margin: 0; padding: 0; background-color: #fce4ec; 
             font-family: sans-serif; display: flex; flex-direction: column; 
@@ -12,33 +13,37 @@
             touch-action: none; overflow-x: hidden;
         }
 
+        /* --- ヘッダー --- */
         #game-header { 
             width: 100%; height: 50px; display: none; 
             justify-content: center; align-items: center; margin-top: 5px;
         }
         #timer-box { background: #ad1457; color: white; padding: 5px 25px; border-radius: 20px; font-weight: bold; font-size: 20px; }
 
+        /* --- コンテナ：比率のシミュレーション徹底 --- */
         .content-frame {
             width: 95%; max-width: 480px; margin: 10px auto 0 auto;
             position: relative; box-shadow: 0 4px 15px rgba(0,0,0,0.1); 
             border-radius: 10px; overflow: hidden; background: #fff;
         }
-
         #portrait-frame { aspect-ratio: 2 / 3; display: block; }
         #landscape-frame { aspect-ratio: 3 / 2; display: none; }
         #puzzle-frame { aspect-ratio: 1 / 1; display: none; }
 
         .full-asset { width: 100%; height: 100%; object-fit: cover; display: block; }
-        canvas { width: 100%; height: 100%; display: block; background: #fff; cursor: none; }
+        canvas { width: 100%; height: 100%; display: block; background: #fff; }
 
+        /* --- 9パズル専用 --- */
         #puzzle-preview-area { display: none; flex-direction: column; align-items: center; margin-top: 5px; }
         #puzzle-sample-img { width: 70px; height: 70px; object-fit: cover; border: 2px solid #ad1457; border-radius: 8px; margin-bottom: 3px; }
         #puzzle-board { display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 1fr); width: 100%; height: 100%; gap: 1px; background: #333; }
         .tile { width: 100%; height: 100%; background-image: url("image-3.jpg"); background-size: 300% 300%; background-repeat: no-repeat; }
         .empty { background: #eee !important; background-image: none !important; }
 
+        /* --- タップ判定：z-index 1000で最前面固定 --- */
         .hit-area { position: absolute; cursor: pointer; z-index: 1000; }
 
+        /* --- UIボタンエリア --- */
         #ui-control-panel { width: 90%; max-width: 480px; text-align: center; padding-top: 5px; }
         .action-btn { display: block; width: 100%; padding: 16px; margin: 10px 0; color: white; border: none; border-radius: 15px; font-size: 18px; font-weight: bold; cursor: pointer; -webkit-tap-highlight-color: transparent; }
         .btn-main { background: #ad1457; box-shadow: 0 4px 0 #78002e; }
@@ -60,12 +65,13 @@
     </div>
     <div id="screen-select" style="width:100%; height:100%; position:relative; display:none;">
         <img src="Select.png" class="full-asset">
-        <div class="hit-area" style="top:25%; left:10%; width:80%; height:13%;" onclick="toBreakout()"></div>
-        <div class="hit-area" style="top:39%; left:10%; width:80%; height:13%;" onclick="toPuzzle()"></div>
+        <div class="hit-area" style="top:22%; left:10%; width:80%; height:14%;" onclick="toPuzzle()"></div>
+        <div class="hit-area" style="top:40%; left:10%; width:80%; height:14%;" onclick="toBreakout()"></div>
     </div>
 </div>
 
 <div id="landscape-frame" class="content-frame"><canvas id="gameCanvas" width="480" height="320"></canvas></div>
+
 <div id="puzzle-frame" class="content-frame"><div id="puzzle-board"></div></div>
 
 <div id="ui-control-panel">
@@ -119,7 +125,7 @@
     function retryBreakout() {
         cMiss.style.display = "none";
         totalPaused += (Date.now() - pauseStart);
-        startTimer(); // タイマーを再開させる
+        startTimer(); // タイマー再開
         gameState = "PLAY_BRK";
         drawBreakout();
     }
@@ -196,7 +202,7 @@
     }
     function updateTimer(s) { timerBox.innerText = `TIME: ${Math.floor(s/60).toString().padStart(2,'0')}:${(s%60).toString().padStart(2,'0')}`; }
 
-    // --- 操作系 (PC・スマホ両対応) ---
+    // --- 操作系：PC/スマホ両対応シミュレーション済み ---
     let isDragging = false;
     function movePaddle(clientX) {
         if(gameState !== "PLAY_BRK") return;
@@ -205,12 +211,11 @@
         let targetX = (clientX - rect.left) * scale - (paddleWidth / 2);
         paddleX = Math.max(0, Math.min(canvas.width - paddleWidth, targetX));
     }
-
-    canvas.addEventListener("mousedown", (e) => { isDragging = true; movePaddle(e.clientX); });
+    window.addEventListener("mousedown", (e) => { isDragging = true; movePaddle(e.clientX); });
     window.addEventListener("mousemove", (e) => { if(isDragging) movePaddle(e.clientX); });
     window.addEventListener("mouseup", () => { isDragging = false; });
-    canvas.addEventListener("touchstart", (e) => { movePaddle(e.touches[0].clientX); }, {passive: false});
-    canvas.addEventListener("touchmove", (e) => { e.preventDefault(); movePaddle(e.touches[0].clientX); }, {passive: false});
+    window.addEventListener("touchstart", (e) => { movePaddle(e.touches[0].clientX); }, {passive: false});
+    window.addEventListener("touchmove", (e) => { if(gameState==="PLAY_BRK") { e.preventDefault(); movePaddle(e.touches[0].clientX); } }, {passive: false});
 </script>
 </body>
 </html>
