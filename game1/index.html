@@ -11,7 +11,11 @@
             align-items: center; justify-content: center; min-height: 100vh;
             touch-action: none; overflow: hidden;
         }
-        #header-area { width: 100%; height: 60px; display: flex; justify-content: center; align-items: center; }
+        /* 初期状態ではヘッダー（TIME）を隠しておく */
+        #header-area { 
+            width: 100%; height: 60px; display: none; 
+            justify-content: center; align-items: center; 
+        }
         #timer-box { background: #ad1457; color: white; padding: 5px 25px; border-radius: 20px; font-weight: bold; font-size: 22px; }
 
         #canvas-container { width: 95%; max-width: 480px; margin: 10px 0; position: relative; aspect-ratio: 2/3; }
@@ -36,7 +40,7 @@
         .full-img { width: 100%; height: 100%; object-fit: contain; display: block; }
         
         /* 透明なタップ判定エリア */
-        .hit-area { position: absolute; cursor: pointer; z-index: 110; /* background: rgba(255,0,0,0.3); */ }
+        .hit-area { position: absolute; cursor: pointer; z-index: 110; }
     </style>
 </head>
 <body>
@@ -76,6 +80,7 @@
     var ctx = canvas.getContext("2d");
     var msg = document.getElementById("msg");
     var timerBox = document.getElementById("timer-box");
+    var headerArea = document.getElementById("header-area");
     var missControls = document.getElementById("miss-controls");
     var winControls = document.getElementById("win-controls");
     
@@ -85,7 +90,6 @@
     var ballRadius = 10;
     var x, y, dx, dy, paddleX, score, startTime, totalPaused, pauseStart;
     
-    // 加速機能
     var speedMultiplier = 1.0;
     const MAX_SPEED_MULTIPLIER = 2.0;
     const SPEED_INCREMENT = 0.00015;
@@ -97,7 +101,6 @@
     var gameState = "top";
     var lastTouchX = null;
 
-    // 画面遷移関数
     function showSelect() {
         topScreen.style.display = "none";
         selectScreen.style.display = "block";
@@ -107,6 +110,7 @@
     function startBreakout() {
         selectScreen.style.display = "none";
         canvas.style.display = "block";
+        headerArea.style.display = "flex"; // ここでTIME表示を出す
         init();
         startTime = Date.now();
         gameState = "play";
@@ -139,7 +143,6 @@
 
     function restartGame() { location.reload(); }
 
-    // 操作
     function handleMove(currentClientX) {
         if (gameState !== "play") return;
         if (lastTouchX !== null) {
