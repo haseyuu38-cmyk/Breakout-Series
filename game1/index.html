@@ -2,18 +2,16 @@
 <html lang="ja">
 <head>
     <meta charset="utf-8" />
-    <title>ちっくゲーム - Final</title>
+    <title>ちっくゲーム - Final Fix</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <style>
         body { margin: 0; padding: 0; background-color: #fce4ec; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; min-height: 100vh; touch-action: none; overflow: hidden; }
         #game-header { width: 100%; height: 50px; display: none; justify-content: center; align-items: center; margin-top: 5px; }
         #timer-box { background: #ad1457; color: white; padding: 5px 25px; border-radius: 20px; font-weight: bold; font-size: 20px; }
-        
         .content-frame { width: 95%; max-width: 480px; margin: 10px auto 0 auto; position: relative; box-shadow: 0 4px 15px rgba(0,0,0,0.1); border-radius: 10px; overflow: hidden; background: #fff; z-index: 10; }
         #portrait-frame { aspect-ratio: 2 / 3; display: block; }
         #landscape-frame { aspect-ratio: 3 / 2; display: none; }
         #puzzle-frame { aspect-ratio: 1 / 1; display: none; }
-        
         canvas { width: 100%; height: 100%; display: block; background: #fff; }
         .full-asset { width: 100%; height: 100%; object-fit: cover; display: block; }
         
@@ -23,14 +21,13 @@
         #puzzle-board { display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 1fr); width: 100%; height: 100%; gap: 1px; background: #333; }
         .tile { width: 100%; height: 100%; background-image: url("image-3.jpg"); background-size: 300% 300%; background-repeat: no-repeat; }
         .empty { background: #eee !important; background-image: none !important; }
-        
         #clear-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: none; background: #fff; z-index: 20; }
         #clear-full-image { width: 100%; height: 100%; object-fit: contain; }
 
         .hit-area { position: absolute; cursor: pointer; z-index: 100; }
 
         #ui-control-panel { width: 90%; max-width: 480px; text-align: center; padding-top: 5px; position: relative; z-index: 9999; }
-        .action-btn { display: block; width: 100%; padding: 16px; margin: 10px 0; color: white; border: none; border-radius: 15px; font-size: 18px; font-weight: bold; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+        .action-btn { display: block; width: 100%; padding: 16px; margin: 10px 0; color: white; border: none; border-radius: 15px; font-size: 18px; font-weight: bold; cursor: pointer; -webkit-tap-highlight-color: transparent; position: relative; }
         .btn-main { background: #ad1457; box-shadow: 0 4px 0 #78002e; }
         .btn-light { background: #f06292; box-shadow: 0 4px 0 #ad1457; }
         .btn-deep { background: #e91e63; box-shadow: 0 4px 0 #c2185b; }
@@ -71,9 +68,9 @@
         <button class="action-btn btn-deep" onclick="backToSelect()">Game selection</button>
     </div>
     <div id="controls-miss" style="display:none;">
-        <button class="action-btn btn-main" onclick="retryBreakout()" ontouchstart="retryBreakout()">あきらめない！</button>
-        <button class="action-btn btn-light" onclick="toBreakout()" ontouchstart="toBreakout()">最初からやり直す</button>
-        <button class="action-btn btn-deep" onclick="backToSelect()" ontouchstart="backToSelect()">Game selection</button>
+        <button class="action-btn btn-main" onclick="retryBreakout()">あきらめない！</button>
+        <button class="action-btn btn-light" onclick="toBreakout()">最初からやり直す</button>
+        <button class="action-btn btn-deep" onclick="backToSelect()">Game selection</button>
     </div>
     <div id="controls-win" style="display:none;">
         <div id="win-message" style="font-size: 18px; color: #ad1457; font-weight: bold; margin-bottom: 10px;"></div>
@@ -104,13 +101,11 @@
         if(timerId) clearInterval(timerId);
         animId = null; timerId = null; isDragging = false; lastX = null;
     }
-
     function hideAll() {
         resetGameState();
         pFrame.style.display = lFrame.style.display = pzFrame.style.display = pzInfo.style.display = cMiss.style.display = cWin.style.display = pzControls.style.display = header.style.display = "none";
         pzClearLayer.style.display = "none"; pzBoard.style.display = "grid";
     }
-
     function toSelect() { sTop.style.display = "none"; sSelect.style.display = "block"; gameState = "SELECT"; }
     function backToSelect() { hideAll(); pFrame.style.display = "block"; sSelect.style.display = "block"; gameState = "SELECT"; }
 
@@ -126,7 +121,8 @@
         for(let c=0; c<5; c++) { bricks[c] = []; for(let r=0; r<3; r++) { bricks[c][r] = { x: 0, y: 0, status: 1 }; } }
     }
     function retryBreakout() {
-        resetGameState(); cMiss.style.display = "none";
+        resetGameState();
+        cMiss.style.display = "none";
         if (pauseStart) totalPaused += (Date.now() - pauseStart);
         startTimer(false);
         gameState = "PLAY_BRK"; drawBreakout();
@@ -207,6 +203,7 @@
     }
     function updateTimer(s) { timerBox.innerText = `TIME: ${Math.floor(s/60).toString().padStart(2,'0')}:${(s%60).toString().padStart(2,'0')}`; }
 
+    /* 操作ロジック：画面全体の操作感とボタンの反応を両立 */
     let lastX = null, isDragging = false;
     function handleMove(clientX) {
         if(gameState !== "PLAY_BRK") return;
@@ -218,13 +215,26 @@
         }
         lastX = clientX;
     }
-    // 操作イベントを「ゲーム用フレーム内」だけに限定
-    lFrame.addEventListener("mousedown", (e) => { isDragging = true; lastX = e.clientX; });
-    window.addEventListener("mousemove", (e) => { if(isDragging) handleMove(e.clientX); });
+
+    // マウス操作
+    window.addEventListener("mousedown", (e) => {
+        if (e.target.tagName === 'BUTTON') return; // ボタンならスルー
+        if(gameState === "PLAY_BRK") { isDragging = true; lastX = e.clientX; }
+    });
+    window.addEventListener("mousemove", (e) => {
+        if(isDragging && gameState === "PLAY_BRK") handleMove(e.clientX);
+    });
     window.addEventListener("mouseup", () => { isDragging = false; lastX = null; });
-    lFrame.addEventListener("touchstart", (e) => { lastX = e.touches[0].clientX; }, {passive: false});
-    lFrame.addEventListener("touchmove", (e) => { if(gameState === "PLAY_BRK") { e.preventDefault(); handleMove(e.touches[0].clientX); } }, {passive: false});
-    lFrame.addEventListener("touchend", () => { lastX = null; });
+
+    // タッチ操作
+    window.addEventListener("touchstart", (e) => {
+        if (e.target.tagName === 'BUTTON') return; // ボタンならスルー
+        if(gameState === "PLAY_BRK") { lastX = e.touches[0].clientX; }
+    }, {passive: false});
+    window.addEventListener("touchmove", (e) => {
+        if(gameState === "PLAY_BRK") { e.preventDefault(); handleMove(e.touches[0].clientX); }
+    }, {passive: false});
+    window.addEventListener("touchend", () => { lastX = null; });
 </script>
 </body>
 </html>
