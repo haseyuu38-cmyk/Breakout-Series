@@ -2,48 +2,49 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8" />
-<title>ちっくゲーム - Fixed</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>ちっくゲーム - Complete Stable</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <style>
 body {
-    margin: 0;
-    padding: 0;
-    background-color: #fce4ec;
-    font-family: sans-serif;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    min-height: 100vh;
-    overflow: hidden;
+    margin:0;
+    padding:0;
+    background:#fce4ec;
+    font-family:sans-serif;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    min-height:100vh;
+    overflow:hidden;
 }
 
-.content-frame {
-    width: 95%;
-    max-width: 480px;
-    margin: 10px auto 0 auto;
-    position: relative;
-    border-radius: 10px;
-    overflow: hidden;
-    background: #fff;
+.content-frame{
+    width:95%;
+    max-width:480px;
+    margin-top:10px;
+    position:relative;
+    border-radius:10px;
+    overflow:hidden;
+    background:#fff;
 }
 
-#landscape-frame { aspect-ratio: 3/2; display:none; }
-canvas {
+#landscape-frame{ aspect-ratio:3/2; display:none; }
+
+canvas{
     width:100%;
     height:100%;
     display:block;
     background:#fff;
-    touch-action:none; /* ← ここだけ無効化 */
+    touch-action:none; /* ← ここ重要 */
 }
 
-#ui-control-panel {
+#ui-control-panel{
     width:90%;
     max-width:480px;
     text-align:center;
 }
 
-.action-btn {
+.action-btn{
     width:100%;
     padding:16px;
     margin:10px 0;
@@ -52,11 +53,13 @@ canvas {
     font-size:18px;
     font-weight:bold;
     color:white;
+    position:relative;
+    z-index:9999;
 }
 
-.btn-main { background:#ad1457; }
-.btn-light { background:#f06292; }
-.btn-deep { background:#e91e63; }
+.btn-main{background:#ad1457;}
+.btn-light{background:#f06292;}
+.btn-deep{background:#e91e63;}
 </style>
 </head>
 
@@ -74,27 +77,27 @@ canvas {
 </div>
 
 <script>
-const canvas = document.getElementById("gameCanvas");
-const ctx = canvas.getContext("2d");
-const cMiss = document.getElementById("controls-miss");
+const canvas=document.getElementById("gameCanvas");
+const ctx=canvas.getContext("2d");
+const cMiss=document.getElementById("controls-miss");
 
-let gameState = "PLAY";
-let animId;
+let gameState="PLAY";
+let animId=null;
 
-const ballRadius = 10;
-const paddleWidth = 80;
+const ballRadius=10;
+const paddleWidth=80;
 
-let x, y, dx, dy, paddleX;
+let x,y,dx,dy,paddleX;
 
 function startGame(){
     cancelAnimationFrame(animId);
     cMiss.style.display="none";
     gameState="PLAY";
-    x = canvas.width/2;
-    y = canvas.height-30;
-    dx = 3;
-    dy = -3;
-    paddleX = (canvas.width-paddleWidth)/2;
+    x=canvas.width/2;
+    y=canvas.height-30;
+    dx=3;
+    dy=-3;
+    paddleX=(canvas.width-paddleWidth)/2;
     draw();
 }
 
@@ -123,7 +126,7 @@ function draw(){
     else if(y+dy>canvas.height-ballRadius){
         if(x>paddleX&&x<paddleX+paddleWidth){
             dy=-Math.abs(dy);
-        } else {
+        }else{
             gameState="MISS";
             cMiss.style.display="block";
             return;
@@ -136,7 +139,7 @@ function draw(){
     animId=requestAnimationFrame(draw);
 }
 
-/* ===== 操作（canvas限定） ===== */
+/* ===== 操作（canvas限定で安全） ===== */
 
 let lastX=null;
 let isDragging=false;
@@ -146,8 +149,8 @@ function handleMove(clientX){
     const scale=canvas.width/rect.width;
 
     if(lastX!==null){
-        let movement=(clientX-lastX)*scale;
-        paddleX=Math.max(0,Math.min(canvas.width-paddleWidth,paddleX+movement));
+        let move=(clientX-lastX)*scale;
+        paddleX=Math.max(0,Math.min(canvas.width-paddleWidth,paddleX+move));
     }
     lastX=clientX;
 }
@@ -185,5 +188,6 @@ canvas.addEventListener("touchend",()=>{
 document.getElementById("landscape-frame").style.display="block";
 startGame();
 </script>
+
 </body>
 </html>
