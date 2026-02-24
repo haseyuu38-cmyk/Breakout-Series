@@ -37,7 +37,15 @@
         .full-asset { width: 100%; height: 100%; object-fit: cover; display: block; }
         canvas { width: 100%; height: 100%; display: block; background: #fff; }
 
-        /* --- 9パズル用スタイル --- */
+        /* --- 9パズル用追加スタイル --- */
+        #puzzle-preview-area {
+            display: none; /* パズル時のみ表示 */
+            flex-direction: column; align-items: center; margin-top: 10px;
+        }
+        #puzzle-sample-img {
+            width: 80px; height: 80px; object-fit: cover;
+            border: 2px solid #ad1457; border-radius: 8px; margin-bottom: 5px;
+        }
         #puzzle-board {
             display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 1fr);
             width: 100%; height: 100%; gap: 1px; background: #333;
@@ -49,7 +57,7 @@
         .empty { background: #eee !important; background-image: none !important; }
 
         /* --- タップ判定エリア --- */
-        .hit-area { position: absolute; cursor: pointer; z-index: 10; }
+        .hit-area { position: absolute; cursor: pointer; z-index: 100; }
 
         /* --- ボタンエリア --- */
         #ui-control-panel { width: 90%; max-width: 480px; text-align: center; padding-top: 5px; }
@@ -58,8 +66,6 @@
             color: white; border: none; border-radius: 15px; font-size: 18px; font-weight: bold; 
             cursor: pointer; -webkit-tap-highlight-color: transparent;
         }
-        .action-btn:active { transform: translateY(2px); opacity: 0.9; }
-
         .btn-main { background: #ad1457; box-shadow: 0 4px 0 #78002e; }
         .btn-light { background: #f06292; box-shadow: 0 4px 0 #ad1457; }
         .btn-deep { background: #e91e63; box-shadow: 0 4px 0 #c2185b; }
@@ -73,6 +79,11 @@
     <div id="timer-box">TIME: 00:00</div>
 </div>
 
+<div id="puzzle-preview-area">
+    <img src="image-3.jpg" id="puzzle-sample-img" alt="見本">
+    <div style="font-size: 12px; color: #ad1457; font-weight: bold;">これを完成させてね！</div>
+</div>
+
 <div id="portrait-frame" class="content-frame">
     <div id="screen-top" style="width:100%; height:100%; position:relative;">
         <img src="Top.png" class="full-asset" alt="Top">
@@ -80,8 +91,8 @@
     </div>
     <div id="screen-select" style="width:100%; height:100%; position:relative; display:none;">
         <img src="Select.png" class="full-asset" alt="Select">
-        <div class="hit-area" style="top:25%; left:10%; width:80%; height:15%;" onclick="toBreakout()"></div>
-        <div class="hit-area" style="top:42%; left:10%; width:80%; height:15%;" onclick="toPuzzle()"></div>
+        <div class="hit-area" style="top:25%; left:10%; width:80%; height:12%;" onclick="toBreakout()"></div>
+        <div class="hit-area" style="top:40%; left:10%; width:80%; height:15%;" onclick="toPuzzle()"></div>
     </div>
 </div>
 
@@ -110,6 +121,7 @@
 </div>
 
 <script>
+    // --- 宣言部 ---
     const canvas = document.getElementById("gameCanvas");
     const ctx = canvas.getContext("2d");
     const header = document.getElementById("game-header");
@@ -117,6 +129,7 @@
     const pFrame = document.getElementById("portrait-frame");
     const lFrame = document.getElementById("landscape-frame");
     const pzFrame = document.getElementById("puzzle-frame");
+    const pzPreview = document.getElementById("puzzle-preview-area");
     const sTop = document.getElementById("screen-top");
     const sSelect = document.getElementById("screen-select");
     const cMiss = document.getElementById("controls-miss");
@@ -126,38 +139,42 @@
 
     let gameState = "TOP";
     let startTime, timerId, totalPaused, pauseStart;
+    let tiles = [1, 2, 3, 4, 5, 6, 7, 8, null];
+    let moveCount = 0;
 
-    // --- ブロック崩し用変数 ---
-    let ballRadius = 10, x, y, dx, dy, paddleX, score, paddleWidth = 80, bricks = [];
+    // ブロック崩し用
+    let x, y, dx, dy, paddleX, score, paddleWidth = 80, bricks = [];
     let speedMultiplier = 1.0;
     const imgWin = new Image(); imgWin.src = 'Image.png';
     const imgMiss = new Image(); imgMiss.src = 'Miss.png';
 
-    // --- 9パズル用変数 ---
-    let tiles = [1, 2, 3, 4, 5, 6, 7, 8, null];
-    let moveCount = 0;
+    // --- 共通遷移 ---
+    function hideAllFrames() {
+        pFrame.style.display = "none";
+        lFrame.style.display = "none";
+        pzFrame.style.display = "none";
+        pzPreview.style.display = "none";
+        cMiss.style.display = "none";
+        cWin.style.display = "none";
+        pzStartBtn.style.display = "none";
+        header.style.display = "none";
+    }
 
-    // --- 遷移処理 ---
+    function backToSelect() {
+        if(timerId) clearInterval(timerId);
+        hideAllFrames();
+        pFrame.style.display = "block";
+        sSelect.style.display = "block";
+        gameState = "SELECT";
+    }
+
     function toSelect() {
         sTop.style.display = "none";
         sSelect.style.display = "block";
         gameState = "SELECT";
     }
 
-    function backToSelect() {
-        lFrame.style.display = "none";
-        pzFrame.style.display = "none";
-        header.style.display = "none";
-        cWin.style.display = "none";
-        cMiss.style.display = "none";
-        pzStartBtn.style.display = "none";
-        pFrame.style.display = "block";
-        sSelect.style.display = "block";
-        gameState = "SELECT";
-        if(timerId) clearInterval(timerId);
-    }
-
-    // --- ブロック崩し実行部 ---
+    // --- ブロック崩し ---
     function toBreakout() {
         hideAllFrames();
         lFrame.style.display = "block";
@@ -190,10 +207,47 @@
         drawBreakout();
     }
 
-    // --- 9パズル実行部 ---
+    function drawBreakout() {
+        if (gameState !== "PLAY_BRK") return;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        if (speedMultiplier < 2.0) speedMultiplier += 0.00015;
+        for(let c=0; c<5; c++) {
+            for(let r=0; r<3; r++) {
+                let b = bricks[c][r];
+                if(b.status === 1) {
+                    let bx = (c * 85) + 30; let by = (r * 30) + 30;
+                    b.x = bx; b.y = by;
+                    ctx.fillStyle = "#f06292"; ctx.fillRect(bx, by, 75, 20);
+                    if(x > bx && x < bx + 75 && y > by && y < by + 20) {
+                        dy = -dy; b.status = 0; score++;
+                        if(score === 15) { gameState = "WIN_BRK"; clearInterval(timerId); cWin.style.display = "block"; }
+                    }
+                }
+            }
+        }
+        ctx.beginPath(); ctx.arc(x, y, ballRadius, 0, Math.PI*2); ctx.fillStyle = "#ff4081"; ctx.fill(); ctx.closePath();
+        ctx.fillStyle = "#ad1457"; ctx.fillRect(paddleX, canvas.height - 10, paddleWidth, 10);
+        if(x + dx > canvas.width - ballRadius || x + dx < ballRadius) dx = -dx;
+        if(y + dy < ballRadius) dy = -dy;
+        else if(y + dy > canvas.height - ballRadius) {
+            if(x > paddleX && x < paddleX + paddleWidth) dy = -Math.abs(dy);
+            else { gameState = "MISS_BRK"; clearInterval(timerId); pauseStart = Date.now(); cMiss.style.display = "block"; }
+        }
+        if (gameState === "PLAY_BRK") {
+            x += dx * speedMultiplier; y += dy * speedMultiplier;
+            requestAnimationFrame(drawBreakout);
+        } else if (gameState === "MISS_BRK") {
+            ctx.drawImage(imgMiss, 0, 0, 480, 320);
+        } else if (gameState === "WIN_BRK") {
+            ctx.drawImage(imgWin, 0, 0, 480, 320);
+        }
+    }
+
+    // --- 9パズル ---
     function toPuzzle() {
         hideAllFrames();
         pzFrame.style.display = "block";
+        pzPreview.style.display = "flex"; // 見本表示
         header.style.display = "flex";
         pzStartBtn.style.display = "block";
         tiles = [1, 2, 3, 4, 5, 6, 7, 8, null];
@@ -258,16 +312,7 @@
         }
     }
 
-    // --- 共通ヘルパー ---
-    function hideAllFrames() {
-        pFrame.style.display = "none";
-        lFrame.style.display = "none";
-        pzFrame.style.display = "none";
-        cMiss.style.display = "none";
-        cWin.style.display = "none";
-        pzStartBtn.style.display = "none";
-    }
-
+    // --- タイマー ---
     function startGlobalTimer() {
         if (timerId) clearInterval(timerId);
         startTime = Date.now();
@@ -277,54 +322,12 @@
             updateTimerDisplay(elapsed);
         }, 1000);
     }
-
     function updateTimerDisplay(s) {
         timerBox.innerText = `TIME: ${Math.floor(s/60).toString().padStart(2,'0')}:${(s%60).toString().padStart(2,'0')}`;
     }
 
-    // --- ブロック崩し描画ループ ---
-    function drawBreakout() {
-        if (gameState !== "PLAY_BRK") return;
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        if (speedMultiplier < 2.0) speedMultiplier += 0.00015;
-        // ブロック・ボール・パドルの描画ロジック (中身は前回と同じ)
-        for(let c=0; c<5; c++) {
-            for(let r=0; r<3; r++) {
-                let b = bricks[c][r];
-                if(b.status === 1) {
-                    let bx = (c * 85) + 30; let by = (r * 30) + 30;
-                    b.x = bx; b.y = by;
-                    ctx.fillStyle = "#f06292"; ctx.fillRect(bx, by, 75, 20);
-                    if(x > bx && x < bx + 75 && y > by && y < by + 20) {
-                        dy = -dy; b.status = 0; score++;
-                        if(score === 15) { 
-                            gameState = "WIN_BRK"; 
-                            clearInterval(timerId);
-                            cWin.style.display = "block"; 
-                        }
-                    }
-                }
-            }
-        }
-        ctx.beginPath(); ctx.arc(x, y, ballRadius, 0, Math.PI*2); ctx.fillStyle = "#ff4081"; ctx.fill(); ctx.closePath();
-        ctx.fillStyle = "#ad1457"; ctx.fillRect(paddleX, canvas.height - 10, paddleWidth, 10);
-        if(x + dx > canvas.width - ballRadius || x + dx < ballRadius) dx = -dx;
-        if(y + dy < ballRadius) dy = -dy;
-        else if(y + dy > canvas.height - ballRadius) {
-            if(x > paddleX && x < paddleX + paddleWidth) dy = -Math.abs(dy);
-            else { gameState = "MISS_BRK"; clearInterval(timerId); pauseStart = Date.now(); cMiss.style.display = "block"; }
-        }
-        if (gameState === "PLAY_BRK") {
-            x += dx * speedMultiplier; y += dy * speedMultiplier;
-            requestAnimationFrame(drawBreakout);
-        } else if (gameState === "MISS_BRK") {
-            ctx.drawImage(imgMiss, 0, 0, 480, 320);
-        } else if (gameState === "WIN_BRK") {
-            ctx.drawImage(imgWin, 0, 0, 480, 320);
-        }
-    }
-
-    // --- 操作イベント (ブロック崩し用) ---
+    // --- ブロック崩し操作 ---
+    let lastTouchX = null;
     function handleMove(clientX) {
         if (gameState !== "PLAY_BRK") return;
         const rect = canvas.getBoundingClientRect();
