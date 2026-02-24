@@ -5,36 +5,42 @@
     <title>ちっくゲーム - Portal</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <style>
-        /* 1. 画面全体のレイアウト */
         body { 
             margin: 0; padding: 0; background-color: #fce4ec; 
             font-family: sans-serif; display: flex; flex-direction: column; 
             align-items: center; justify-content: flex-start; min-height: 100vh;
-            touch-action: none; overflow-x: hidden;
+            touch-action: none;
         }
 
-        /* 2. ヘッダー（TIME） */
+        /* TIME表示 */
         #header-area { 
             width: 100%; height: 50px; display: none; 
-            justify-content: center; align-items: center;
+            justify-content: center; align-items: center; margin-top: 5px;
         }
         #timer-box { background: #ad1457; color: white; padding: 5px 25px; border-radius: 20px; font-weight: bold; font-size: 20px; }
 
-        /* 3. ゲーム・画像コンテナ（比率を3:2で固定） */
-        #canvas-container { 
+        /* 画像エリアの共通設定 */
+        .display-area { 
             width: 95%; max-width: 480px; position: relative; 
             margin: 10px auto 0 auto;
-            aspect-ratio: 3 / 2; /* 歪みを防ぐ絶対設定 */
-        }
-        canvas { 
-            background: #ffffff; display: block; width: 100%; height: 100%; 
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1); border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1); border-radius: 10px; overflow: hidden;
+            background: #fff;
         }
 
-        /* 4. UIエリア（画像の下に直結させる） */
+        /* 1. トップ・セレクト画面用（縦長 2:3） */
+        #screen-container { aspect-ratio: 2 / 3; display: block; }
+        
+        /* 2. ゲーム画面用（横長 3:2） */
+        #canvas-wrapper { aspect-ratio: 3 / 2; display: none; }
+        
+        canvas { width: 100%; height: 100%; display: block; }
+        .full-img { width: 100%; height: 100%; object-fit: contain; display: block; }
+        .hit-area { position: absolute; cursor: pointer; z-index: 110; }
+
+        /* ボタンエリア */
         #ui-area { 
             width: 90%; max-width: 480px; text-align: center;
-            padding-top: 10px; /* 画像との最低限の隙間 */
+            padding-top: 5px;
         }
         .btn { 
             display: block; width: 100%; padding: 16px; margin: 10px 0; 
@@ -43,14 +49,6 @@
             cursor: pointer; -webkit-tap-highlight-color: transparent;
         }
         .btn:active { transform: translateY(2px); box-shadow: 0 2px 0 #78002e; }
-
-        /* 5. 画像スクリーン（Top/Select用） */
-        .screen-overlay {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            z-index: 100; display: none; background: #fff; border-radius: 10px;
-        }
-        .full-img { width: 100%; height: 100%; object-fit: fill; border-radius: 10px; }
-        .hit-area { position: absolute; cursor: pointer; z-index: 110; }
     </style>
 </head>
 <body>
@@ -59,18 +57,19 @@
     <div id="timer-box">TIME: 00:00</div>
 </div>
 
-<div id="canvas-container">
-    <div id="top-screen" class="screen-overlay" style="display: block;">
+<div id="screen-container" class="display-area">
+    <div id="top-screen" style="position:relative; width:100%; height:100%; display:block;">
         <img src="Top.png" class="full-img" alt="Top">
         <div id="go-select-hit" class="hit-area" style="top: 60%; left: 15%; width: 70%; height: 25%;" onclick="showSelect()"></div>
     </div>
-
-    <div id="select-screen" class="screen-overlay">
+    <div id="select-screen" style="position:relative; width:100%; height:100%; display:none;">
         <img src="Select.png" class="full-img" alt="Select">
         <div id="start-breakout-hit" class="hit-area" style="top: 25%; left: 10%; width: 80%; height: 20%;" onclick="startBreakout()"></div>
     </div>
-    
-    <canvas id="myCanvas" width="480" height="320" style="display: none;"></canvas>
+</div>
+
+<div id="canvas-wrapper" class="display-area">
+    <canvas id="myCanvas" width="480" height="320"></canvas>
 </div>
 
 <div id="ui-area">
@@ -92,6 +91,8 @@
     var headerArea = document.getElementById("header-area");
     var missControls = document.getElementById("miss-controls");
     var winControls = document.getElementById("win-controls");
+    var screenContainer = document.getElementById("screen-container");
+    var canvasWrapper = document.getElementById("canvas-wrapper");
     var topScreen = document.getElementById("top-screen");
     var selectScreen = document.getElementById("select-screen");
 
@@ -110,25 +111,38 @@
 
     function showSelect() {
         topScreen.style.display = "none";
-        canvas.style.display = "none";
-        headerArea.style.display = "none";
-        winControls.style.display = "none";
-        missControls.style.display = "none";
         selectScreen.style.display = "block";
         gameState = "select";
     }
 
     function startBreakout() {
-        selectScreen.style.display = "none";
+        screenContainer.style.display = "none";
         winControls.style.display = "none";
         missControls.style.display = "none";
-        canvas.style.display = "block";
+        
+        canvasWrapper.style.display = "block";
         headerArea.style.display = "flex";
         init();
         startTime = Date.now();
         gameState = "play";
         draw();
     }
+
+    // セレクト画面に戻る（リセット含む）
+    function showSelectFromGame() {
+        canvasWrapper.style.display = "none";
+        headerArea.style.display = "none";
+        winControls.style.display = "none";
+        missControls.style.display = "none";
+        
+        screenContainer.style.display = "block";
+        selectScreen.style.display = "block";
+        topScreen.style.display = "none";
+        gameState = "select";
+    }
+
+    // ※showSelect関数を「セレクトに戻る」ボタン用に拡張
+    window.showSelect = showSelectFromGame;
 
     function init() {
         x = canvas.width/2; y = canvas.height-30;
@@ -175,7 +189,6 @@
         if(gameState === "play") {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             if (speedMultiplier < MAX_SPEED_MULTIPLIER) { speedMultiplier += SPEED_INCREMENT; }
-
             for(var c=0; c<5; c++) {
                 for(var r=0; r<3; r++) {
                     var b = bricks[c][r];
@@ -219,10 +232,10 @@
             requestAnimationFrame(draw);
         } 
         else if(gameState === "miss") {
-            ctx.drawImage(missImg, 0, 0, 480, 320); // 比率を固定して描画
+            ctx.drawImage(missImg, 0, 0, 480, 320);
         } 
         else if(gameState === "win") {
-            ctx.drawImage(winImg, 0, 0, 480, 320); // 比率を固定して描画
+            ctx.drawImage(winImg, 0, 0, 480, 320);
         }
     }
 </script>
