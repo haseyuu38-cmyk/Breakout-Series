@@ -3,25 +3,25 @@
 <head>
     <meta charset="utf-8" />
     <title>ちっくゲーム - Portal Official</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
     <style>
-        /* 100vhの代わりに動的な高さを確保し、Androidのバー対策を行う */
-        :root { --app-height: 100%; }
-        html, body { height: 100%; margin: 0; padding: 0; }
+        /* 比率を維持し、はみ出し時はスクロールを許可する設定 */
+        html, body { 
+            height: 100%; 
+            margin: 0; 
+            padding: 0; 
+            background-color: #fce4ec; 
+        }
         
         body { 
-            background-color: #fce4ec; 
             font-family: sans-serif; 
             display: flex; 
             flex-direction: column; 
             align-items: center; 
             justify-content: flex-start; 
-            min-height: 100vh;
-            min-height: -webkit-fill-available;
-            touch-action: none; 
-            /* ボタンがはみ出した時だけスクロールを許可する安全策 */
-            overflow-y: auto; 
             overflow-x: hidden;
+            overflow-y: auto; /* はみ出したボタンをスクロールで救済 */
+            -webkit-overflow-scrolling: touch;
         }
 
         #game-header { width: 100%; height: 50px; display: none; justify-content: center; align-items: center; margin-top: 5px; flex-shrink: 0; }
@@ -31,18 +31,17 @@
         #puzzle-sample-img { width: 60px; height: 60px; object-fit: cover; border: 2px solid #ad1457; border-radius: 8px; margin-bottom: 2px; }
         #puzzle-stats { font-size: 16px; font-weight: bold; color: #ad1457; }
 
-        /* ゲーム枠：高さが足りない場合に縮小するよう調整 */
+        /* ゲーム枠：比率（aspect-ratio）を絶対死守 */
         .content-frame { 
             width: 95%; 
             max-width: 480px; 
-            max-height: 65vh; /* 画面の高さに応じて縮小 */
-            margin: 5px auto; 
+            margin: 10px auto; 
             position: relative; 
             border-radius: 10px; 
             overflow: hidden; 
             background: #fff; 
             box-shadow: 0 4px 15px rgba(0,0,0,0.1); 
-            flex-shrink: 1; 
+            flex-shrink: 0; /* 縮ませない */
         }
         #portrait-frame { aspect-ratio: 2 / 3; display: block; }
         #landscape-frame { aspect-ratio: 3 / 2; display: none; }
@@ -51,8 +50,16 @@
         canvas { width: 100%; height: 100%; display: block; background: #fff; touch-action: none; }
         .full-asset { width: 100%; height: 100%; object-fit: cover; display: block; }
 
-        /* フリッカー対策：背景をボディカラーに合わせる */
-        #puzzle-board { display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 1fr); width: 100%; height: 100%; gap: 1px; background: #fce4ec; }
+        /* 起動時の黒色対策 */
+        #puzzle-board { 
+            display: grid; 
+            grid-template-columns: repeat(3, 1fr); 
+            grid-template-rows: repeat(3, 1fr); 
+            width: 100%; 
+            height: 100%; 
+            gap: 1px; 
+            background: #fce4ec; /* 背景に馴染ませる */
+        }
         .tile { width: 100%; height: 100%; background-size: 300% 300%; background-repeat: no-repeat; }
         .empty { background: #eee !important; background-image: none !important; }
         
@@ -61,9 +68,8 @@
 
         .hit-area { position: absolute; cursor: pointer; z-index: 100; }
 
-        /* UIエリア：下部に固定せず、自然に配置 */
-        #ui-control-panel { width: 90%; max-width: 480px; text-align: center; padding: 5px 0 20px 0; position: relative; z-index: 9999; flex-shrink: 0; }
-        .action-btn { display: block; width: 100%; padding: 14px; margin: 8px 0; color: white; border: none; border-radius: 15px; font-size: 18px; font-weight: bold; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+        #ui-control-panel { width: 90%; max-width: 480px; text-align: center; padding: 10px 0 30px 0; position: relative; z-index: 9999; flex-shrink: 0; }
+        .action-btn { display: block; width: 100%; padding: 16px; margin: 10px 0; color: white; border: none; border-radius: 15px; font-size: 18px; font-weight: bold; cursor: pointer; -webkit-tap-highlight-color: transparent; }
         .btn-main { background: #ad1457; box-shadow: 0 4px 0 #78002e; }
         .btn-light { background: #f06292; box-shadow: 0 4px 0 #ad1457; }
         .btn-deep { background: #e91e63; box-shadow: 0 4px 0 #c2185b; }
@@ -158,11 +164,14 @@
 
     function toBreakout() {
         hideAll(); lFrame.style.display = "block"; header.style.display = "flex";
+        initBreakout(); startTimer(true);
+        gameState = "PLAY_BRK"; winRetryBtn.onclick = toBreakout; drawBreakout();
+    }
+    function initBreakout() {
         x = canvas.width/2; y = canvas.height-35; dx = 2.5; dy = -2.5; speedMultiplier = 1.0;
         paddleX = (canvas.width - paddleWidth) / 2; score = 0; totalPaused = 0;
         bricks = [];
         for(let c=0; c<5; c++) { bricks[c] = []; for(let r=0; r<3; r++) { bricks[c][r] = { x: 0, y: 0, status: 1 }; } }
-        startTimer(true); gameState = "PLAY_BRK"; winRetryBtn.onclick = toBreakout; drawBreakout();
     }
     function retryBreakout() {
         resetEngine(); cMiss.style.display = "none";
@@ -194,8 +203,6 @@
         }
         x += dx * speedMultiplier; y += dy * speedMultiplier;
         animId = requestAnimationFrame(drawBreakout);
-        if (gameState === "MISS_BRK") ctx.drawImage(imgMiss, 0, 0, 480, 320);
-        else if (gameState === "WIN_BRK") ctx.drawImage(imgWin, 0, 0, 480, 320);
     }
 
     function toPuzzle(num) {
