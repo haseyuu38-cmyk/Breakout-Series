@@ -5,15 +5,45 @@
     <title>ちっくゲーム - Portal Official</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <style>
-        body { margin: 0; padding: 0; background-color: #fce4ec; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; min-height: 100vh; touch-action: none; overflow: hidden; }
-        #game-header { width: 100%; height: 50px; display: none; justify-content: center; align-items: center; margin-top: 5px; }
+        /* 100vhの代わりに動的な高さを確保し、Androidのバー対策を行う */
+        :root { --app-height: 100%; }
+        html, body { height: 100%; margin: 0; padding: 0; }
+        
+        body { 
+            background-color: #fce4ec; 
+            font-family: sans-serif; 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            justify-content: flex-start; 
+            min-height: 100vh;
+            min-height: -webkit-fill-available;
+            touch-action: none; 
+            /* ボタンがはみ出した時だけスクロールを許可する安全策 */
+            overflow-y: auto; 
+            overflow-x: hidden;
+        }
+
+        #game-header { width: 100%; height: 50px; display: none; justify-content: center; align-items: center; margin-top: 5px; flex-shrink: 0; }
         #timer-box { background: #ad1457; color: white; padding: 5px 25px; border-radius: 20px; font-weight: bold; font-size: 20px; }
         
-        #puzzle-info-area { display: none; flex-direction: column; align-items: center; margin-top: 5px; width: 100%; }
-        #puzzle-sample-img { width: 70px; height: 70px; object-fit: cover; border: 2px solid #ad1457; border-radius: 8px; margin-bottom: 2px; }
+        #puzzle-info-area { display: none; flex-direction: column; align-items: center; margin-top: 5px; width: 100%; flex-shrink: 0; }
+        #puzzle-sample-img { width: 60px; height: 60px; object-fit: cover; border: 2px solid #ad1457; border-radius: 8px; margin-bottom: 2px; }
         #puzzle-stats { font-size: 16px; font-weight: bold; color: #ad1457; }
 
-        .content-frame { width: 95%; max-width: 480px; margin: 10px auto 0 auto; position: relative; border-radius: 10px; overflow: hidden; background: #fff; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        /* ゲーム枠：高さが足りない場合に縮小するよう調整 */
+        .content-frame { 
+            width: 95%; 
+            max-width: 480px; 
+            max-height: 65vh; /* 画面の高さに応じて縮小 */
+            margin: 5px auto; 
+            position: relative; 
+            border-radius: 10px; 
+            overflow: hidden; 
+            background: #fff; 
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1); 
+            flex-shrink: 1; 
+        }
         #portrait-frame { aspect-ratio: 2 / 3; display: block; }
         #landscape-frame { aspect-ratio: 3 / 2; display: none; }
         #puzzle-frame { aspect-ratio: 1 / 1; display: none; }
@@ -21,7 +51,8 @@
         canvas { width: 100%; height: 100%; display: block; background: #fff; touch-action: none; }
         .full-asset { width: 100%; height: 100%; object-fit: cover; display: block; }
 
-        #puzzle-board { display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 1fr); width: 100%; height: 100%; gap: 1px; background: #333; }
+        /* フリッカー対策：背景をボディカラーに合わせる */
+        #puzzle-board { display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 1fr); width: 100%; height: 100%; gap: 1px; background: #fce4ec; }
         .tile { width: 100%; height: 100%; background-size: 300% 300%; background-repeat: no-repeat; }
         .empty { background: #eee !important; background-image: none !important; }
         
@@ -30,8 +61,9 @@
 
         .hit-area { position: absolute; cursor: pointer; z-index: 100; }
 
-        #ui-control-panel { width: 90%; max-width: 480px; text-align: center; padding-top: 5px; position: relative; z-index: 9999; }
-        .action-btn { display: block; width: 100%; padding: 16px; margin: 10px 0; color: white; border: none; border-radius: 15px; font-size: 18px; font-weight: bold; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+        /* UIエリア：下部に固定せず、自然に配置 */
+        #ui-control-panel { width: 90%; max-width: 480px; text-align: center; padding: 5px 0 20px 0; position: relative; z-index: 9999; flex-shrink: 0; }
+        .action-btn { display: block; width: 100%; padding: 14px; margin: 8px 0; color: white; border: none; border-radius: 15px; font-size: 18px; font-weight: bold; cursor: pointer; -webkit-tap-highlight-color: transparent; }
         .btn-main { background: #ad1457; box-shadow: 0 4px 0 #78002e; }
         .btn-light { background: #f06292; box-shadow: 0 4px 0 #ad1457; }
         .btn-deep { background: #e91e63; box-shadow: 0 4px 0 #c2185b; }
@@ -124,7 +156,6 @@
     function toPzSelect() { hideAll(); pFrame.style.display = "block"; sPzSelect.style.display = "block"; gameState = "PZ_SELECT"; }
     function backToSelect() { toSelect(); }
 
-    /* ブロック崩し */
     function toBreakout() {
         hideAll(); lFrame.style.display = "block"; header.style.display = "flex";
         x = canvas.width/2; y = canvas.height-35; dx = 2.5; dy = -2.5; speedMultiplier = 1.0;
@@ -167,12 +198,12 @@
         else if (gameState === "WIN_BRK") ctx.drawImage(imgWin, 0, 0, 480, 320);
     }
 
-    /* 9パズル */
     function toPuzzle(num) {
         currentPuzzleNum = num;
         hideAll(); pzFrame.style.display = "block"; pzInfo.style.display = "flex"; header.style.display = "flex"; pzControls.style.display = "block";
         document.getElementById("puzzle-start-btn").style.display = "block";
-        pzSampleImg.src = `image-${num}.jpg`; pzFullImg.src = `image-${num}.jpg`;
+        const imgPath = `image-${num}.jpg`;
+        pzSampleImg.src = imgPath; pzFullImg.src = imgPath;
         tiles = [1, 2, 3, 4, 5, 6, 7, 8, null]; moveCount = 0; pzStats.innerText = "手数: 0";
         gameState = "PUZZLE_READY"; winRetryBtn.onclick = () => toPuzzle(num); drawPuzzle(); updateTimer(0);
     }
@@ -221,7 +252,6 @@
     }
     function updateTimer(s) { timerBox.innerText = `TIME: ${Math.floor(s/60).toString().padStart(2,'0')}:${(s%60).toString().padStart(2,'0')}`; }
 
-    /* 操作系 */
     let lastX = null, isDragging = false;
     function handleMove(clientX) {
         if(gameState !== "PLAY_BRK") return;
