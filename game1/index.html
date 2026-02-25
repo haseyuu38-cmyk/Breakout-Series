@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
     <meta charset="utf-8" />
-    <title>ちっくゲーム - Portal Full</title>
+    <title>ちっくゲーム - Portal Official</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <style>
         body { margin: 0; padding: 0; background-color: #fce4ec; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; min-height: 100vh; touch-action: none; overflow: hidden; }
@@ -55,10 +55,15 @@
     </div>
     <div id="screen-select" style="width:100%; height:100%; position:relative; display:none;">
         <img src="Select.png" class="full-asset">
-        <div class="hit-area" style="top:11%; left:11%; width:78%; height:15%;" onclick="toPuzzle(1)"></div>
-        <div class="hit-area" style="top:31%; left:11%; width:78%; height:15%;" onclick="toPuzzle(2)"></div>
-        <div class="hit-area" style="top:51%; left:11%; width:78%; height:15%;" onclick="toPuzzle(3)"></div>
-        <div class="hit-area" style="top:71%; left:11%; width:78%; height:15%;" onclick="toBreakout()"></div>
+        <div class="hit-area" style="top:11%; left:11%; width:78%; height:15%;" onclick="toPzSelect()"></div>
+        <div class="hit-area" style="top:31%; left:11%; width:78%; height:15%;" onclick="toBreakout()"></div>
+    </div>
+    <div id="screen-pz-select" style="width:100%; height:100%; position:relative; display:none;">
+        <img src="Puzzle serect.png" class="full-asset">
+        <div class="hit-area" style="top:29%; left:18%; width:64%; height:10%;" onclick="toPuzzle(1)"></div>
+        <div class="hit-area" style="top:44%; left:18%; width:64%; height:10%;" onclick="toPuzzle(2)"></div>
+        <div class="hit-area" style="top:59%; left:18%; width:64%; height:10%;" onclick="toPuzzle(3)"></div>
+        <div class="hit-area" style="top:5%; left:40%; width:20%; height:15%;" onclick="toSelect()"></div>
     </div>
 </div>
 
@@ -90,7 +95,7 @@
     const canvas = document.getElementById("gameCanvas"), ctx = canvas.getContext("2d");
     const header = document.getElementById("game-header"), timerBox = document.getElementById("timer-box");
     const pFrame = document.getElementById("portrait-frame"), lFrame = document.getElementById("landscape-frame"), pzFrame = document.getElementById("puzzle-frame"), pzInfo = document.getElementById("puzzle-info-area");
-    const sTop = document.getElementById("screen-top"), sSelect = document.getElementById("screen-select");
+    const sTop = document.getElementById("screen-top"), sSelect = document.getElementById("screen-select"), sPzSelect = document.getElementById("screen-pz-select");
     const cMiss = document.getElementById("controls-miss"), cWin = document.getElementById("controls-win"), winRetryBtn = document.getElementById("win-retry-btn");
     const pzControls = document.getElementById("puzzle-controls"), pzStats = document.getElementById("puzzle-stats"), winMsg = document.getElementById("win-message");
     const pzClearLayer = document.getElementById("clear-layer"), pzBoard = document.getElementById("puzzle-board"), pzSampleImg = document.getElementById("puzzle-sample-img"), pzFullImg = document.getElementById("clear-full-image");
@@ -108,27 +113,25 @@
         if(timerId) clearInterval(timerId);
         animId = null; timerId = null; isDragging = false; lastX = null;
     }
-
     function hideAll() {
         resetEngine();
         pFrame.style.display = lFrame.style.display = pzFrame.style.display = pzInfo.style.display = cMiss.style.display = cWin.style.display = pzControls.style.display = header.style.display = "none";
+        sTop.style.display = sSelect.style.display = sPzSelect.style.display = "none";
         pzClearLayer.style.display = "none"; pzBoard.style.display = "grid";
     }
 
-    function toSelect() { sTop.style.display = "none"; sSelect.style.display = "block"; gameState = "SELECT"; }
-    function backToSelect() { hideAll(); pFrame.style.display = "block"; sSelect.style.display = "block"; gameState = "SELECT"; }
+    function toSelect() { hideAll(); pFrame.style.display = "block"; sSelect.style.display = "block"; gameState = "SELECT"; }
+    function toPzSelect() { hideAll(); pFrame.style.display = "block"; sPzSelect.style.display = "block"; gameState = "PZ_SELECT"; }
+    function backToSelect() { toSelect(); }
 
-    /* ブロック崩し：完成ロジック */
+    /* ブロック崩し */
     function toBreakout() {
         hideAll(); lFrame.style.display = "block"; header.style.display = "flex";
-        initBreakout(); startTimer(true);
-        gameState = "PLAY_BRK"; winRetryBtn.onclick = toBreakout; drawBreakout();
-    }
-    function initBreakout() {
         x = canvas.width/2; y = canvas.height-35; dx = 2.5; dy = -2.5; speedMultiplier = 1.0;
         paddleX = (canvas.width - paddleWidth) / 2; score = 0; totalPaused = 0;
         bricks = [];
         for(let c=0; c<5; c++) { bricks[c] = []; for(let r=0; r<3; r++) { bricks[c][r] = { x: 0, y: 0, status: 1 }; } }
+        startTimer(true); gameState = "PLAY_BRK"; winRetryBtn.onclick = toBreakout; drawBreakout();
     }
     function retryBreakout() {
         resetEngine(); cMiss.style.display = "none";
@@ -164,18 +167,17 @@
         else if (gameState === "WIN_BRK") ctx.drawImage(imgWin, 0, 0, 480, 320);
     }
 
-    /* 9パズル：no.1〜no.3 共通ロジック */
+    /* 9パズル */
     function toPuzzle(num) {
         currentPuzzleNum = num;
-        const imgPath = `image-${num}.jpg`;
         hideAll(); pzFrame.style.display = "block"; pzInfo.style.display = "flex"; header.style.display = "flex"; pzControls.style.display = "block";
         document.getElementById("puzzle-start-btn").style.display = "block";
-        pzSampleImg.src = imgPath; pzFullImg.src = imgPath;
+        pzSampleImg.src = `image-${num}.jpg`; pzFullImg.src = `image-${num}.jpg`;
         tiles = [1, 2, 3, 4, 5, 6, 7, 8, null]; moveCount = 0; pzStats.innerText = "手数: 0";
         gameState = "PUZZLE_READY"; winRetryBtn.onclick = () => toPuzzle(num); drawPuzzle(); updateTimer(0);
     }
     function shufflePuzzle() {
-        document.getElementById("puzzle-start-btn").style.display = "none"; moveCount = 0; pzStats.innerText = "手数: 0";
+        document.getElementById("puzzle-start-btn").style.display = "none";
         for (let i = 0; i < 150; i++) {
             const e = tiles.indexOf(null), m = [];
             if (e % 3 !== 0) m.push(e - 1); if (e % 3 !== 2) m.push(e + 1); if (e >= 3) m.push(e - 3); if (e < 6) m.push(e + 3);
@@ -199,7 +201,7 @@
                             resetEngine(); gameState = "WIN_PZL";
                             header.style.display = "none"; pzInfo.style.display = "none"; pzBoard.style.display = "none";
                             pzClearLayer.style.display = "block";
-                            winMsg.innerText = "クリア！手数: " + moveCount + "回 / タイム: " + finalS + "秒";
+                            winMsg.innerText = `クリア！手数: ${moveCount}回 / タイム: ${finalS}秒`;
                             cWin.style.display = "block"; pzControls.style.display = "none";
                         }
                     }
@@ -219,6 +221,7 @@
     }
     function updateTimer(s) { timerBox.innerText = `TIME: ${Math.floor(s/60).toString().padStart(2,'0')}:${(s%60).toString().padStart(2,'0')}`; }
 
+    /* 操作系 */
     let lastX = null, isDragging = false;
     function handleMove(clientX) {
         if(gameState !== "PLAY_BRK") return;
