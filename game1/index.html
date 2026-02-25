@@ -5,24 +5,8 @@
     <title>ちっくゲーム - Portal Official</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
     <style>
-        /* 比率を維持し、はみ出し時はスクロールを許可する設定 */
-        html, body { 
-            height: 100%; 
-            margin: 0; 
-            padding: 0; 
-            background-color: #fce4ec; 
-        }
-        
-        body { 
-            font-family: sans-serif; 
-            display: flex; 
-            flex-direction: column; 
-            align-items: center; 
-            justify-content: flex-start; 
-            overflow-x: hidden;
-            overflow-y: auto; /* はみ出したボタンをスクロールで救済 */
-            -webkit-overflow-scrolling: touch;
-        }
+        html, body { height: 100%; margin: 0; padding: 0; background-color: #fce4ec; }
+        body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; overflow-x: hidden; overflow-y: auto; -webkit-overflow-scrolling: touch; }
 
         #game-header { width: 100%; height: 50px; display: none; justify-content: center; align-items: center; margin-top: 5px; flex-shrink: 0; }
         #timer-box { background: #ad1457; color: white; padding: 5px 25px; border-radius: 20px; font-weight: bold; font-size: 20px; }
@@ -31,18 +15,7 @@
         #puzzle-sample-img { width: 60px; height: 60px; object-fit: cover; border: 2px solid #ad1457; border-radius: 8px; margin-bottom: 2px; }
         #puzzle-stats { font-size: 16px; font-weight: bold; color: #ad1457; }
 
-        /* ゲーム枠：比率（aspect-ratio）を絶対死守 */
-        .content-frame { 
-            width: 95%; 
-            max-width: 480px; 
-            margin: 10px auto; 
-            position: relative; 
-            border-radius: 10px; 
-            overflow: hidden; 
-            background: #fff; 
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1); 
-            flex-shrink: 0; /* 縮ませない */
-        }
+        .content-frame { width: 95%; max-width: 480px; margin: 10px auto; position: relative; border-radius: 10px; overflow: hidden; background: #fff; box-shadow: 0 4px 15px rgba(0,0,0,0.1); flex-shrink: 0; }
         #portrait-frame { aspect-ratio: 2 / 3; display: block; }
         #landscape-frame { aspect-ratio: 3 / 2; display: none; }
         #puzzle-frame { aspect-ratio: 1 / 1; display: none; }
@@ -50,19 +23,11 @@
         canvas { width: 100%; height: 100%; display: block; background: #fff; touch-action: none; }
         .full-asset { width: 100%; height: 100%; object-fit: cover; display: block; }
 
-        /* 起動時の黒色対策 */
-        #puzzle-board { 
-            display: grid; 
-            grid-template-columns: repeat(3, 1fr); 
-            grid-template-rows: repeat(3, 1fr); 
-            width: 100%; 
-            height: 100%; 
-            gap: 1px; 
-            background: #fce4ec; /* 背景に馴染ませる */
-        }
+        #puzzle-board { display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 1fr); width: 100%; height: 100%; gap: 1px; background: #fce4ec; }
         .tile { width: 100%; height: 100%; background-size: 300% 300%; background-repeat: no-repeat; }
         .empty { background: #eee !important; background-image: none !important; }
         
+        /* 共通クリアレイヤー：ブロック崩しとパズルの両方で使用 */
         #clear-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: none; background: #fff; z-index: 20; }
         #clear-full-image { width: 100%; height: 100%; object-fit: contain; }
 
@@ -105,10 +70,18 @@
     </div>
 </div>
 
-<div id="landscape-frame" class="content-frame"><canvas id="gameCanvas" width="480" height="320"></canvas></div>
+<div id="landscape-frame" class="content-frame">
+    <canvas id="gameCanvas" width="480" height="320"></canvas>
+    <div id="brk-clear-layer" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: none; background: #fff; z-index: 20;">
+        <img src="Image.png" style="width: 100%; height: 100%; object-fit: contain;">
+    </div>
+</div>
+
 <div id="puzzle-frame" class="content-frame">
     <div id="puzzle-board"></div>
-    <div id="clear-layer"><img src="" id="clear-full-image"></div>
+    <div id="pz-clear-layer" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: none; background: #fff; z-index: 20;">
+        <img src="" id="pz-clear-full-image" style="width: 100%; height: 100%; object-fit: contain;">
+    </div>
 </div>
 
 <div id="ui-control-panel">
@@ -136,13 +109,13 @@
     const sTop = document.getElementById("screen-top"), sSelect = document.getElementById("screen-select"), sPzSelect = document.getElementById("screen-pz-select");
     const cMiss = document.getElementById("controls-miss"), cWin = document.getElementById("controls-win"), winRetryBtn = document.getElementById("win-retry-btn");
     const pzControls = document.getElementById("puzzle-controls"), pzStats = document.getElementById("puzzle-stats"), winMsg = document.getElementById("win-message");
-    const pzClearLayer = document.getElementById("clear-layer"), pzBoard = document.getElementById("puzzle-board"), pzSampleImg = document.getElementById("puzzle-sample-img"), pzFullImg = document.getElementById("clear-full-image");
+    const pzBoard = document.getElementById("puzzle-board"), pzSampleImg = document.getElementById("puzzle-sample-img");
+    const brkClearLayer = document.getElementById("brk-clear-layer"), pzClearLayer = document.getElementById("pz-clear-layer"), pzFullImg = document.getElementById("pz-clear-full-image");
 
     let gameState = "TOP", startTime, timerId, totalPaused = 0, pauseStart, animId;
     const ballRadius = 10, paddleWidth = 80;
     let x, y, dx, dy, paddleX, score, speedMultiplier = 1.0;
-    const imgWin = new Image(), imgMiss = new Image();
-    imgWin.src = 'Image.png'; imgMiss.src = 'Miss.png';
+    const imgMiss = new Image(); imgMiss.src = 'Miss.png';
     let bricks = [], tiles = [1, 2, 3, 4, 5, 6, 7, 8, null], moveCount = 0;
     let currentPuzzleNum = 1;
 
@@ -155,7 +128,7 @@
         resetEngine();
         pFrame.style.display = lFrame.style.display = pzFrame.style.display = pzInfo.style.display = cMiss.style.display = cWin.style.display = pzControls.style.display = header.style.display = "none";
         sTop.style.display = sSelect.style.display = sPzSelect.style.display = "none";
-        pzClearLayer.style.display = "none"; pzBoard.style.display = "grid";
+        pzClearLayer.style.display = brkClearLayer.style.display = "none"; pzBoard.style.display = "grid";
     }
 
     function toSelect() { hideAll(); pFrame.style.display = "block"; sSelect.style.display = "block"; gameState = "SELECT"; }
@@ -189,7 +162,18 @@
                 if(b.status === 1) {
                     let bx = (c * 85) + 30, by = (r * 30) + 30; b.x = bx; b.y = by;
                     ctx.fillStyle = "#f06292"; ctx.fillRect(bx, by, 75, 20);
-                    if(x > bx && x < bx + 75 && y > by && y < by + 20) { dy = -dy; b.status = 0; score++; if(score === 15) { gameState = "WIN_BRK"; resetEngine(); cWin.style.display = "block"; winMsg.innerText = ""; } }
+                    if(x > bx && x < bx + 75 && y > by && y < by + 20) { 
+                        dy = -dy; b.status = 0; score++; 
+                        if(score === 15) { 
+                            gameState = "WIN_BRK"; 
+                            const fs = Math.floor((Date.now() - startTime - totalPaused) / 1000);
+                            resetEngine(); 
+                            brkClearLayer.style.display = "block"; // ブロック崩し用クリア画像表示
+                            winMsg.innerText = `クリア！ タイム: ${fs}秒`;
+                            header.style.display = "none";
+                            cWin.style.display = "block"; 
+                        } 
+                    }
                 }
             }
         }
@@ -203,14 +187,14 @@
         }
         x += dx * speedMultiplier; y += dy * speedMultiplier;
         animId = requestAnimationFrame(drawBreakout);
+        if (gameState === "MISS_BRK") ctx.drawImage(imgMiss, 0, 0, 480, 320);
     }
 
     function toPuzzle(num) {
         currentPuzzleNum = num;
         hideAll(); pzFrame.style.display = "block"; pzInfo.style.display = "flex"; header.style.display = "flex"; pzControls.style.display = "block";
         document.getElementById("puzzle-start-btn").style.display = "block";
-        const imgPath = `image-${num}.jpg`;
-        pzSampleImg.src = imgPath; pzFullImg.src = imgPath;
+        pzSampleImg.src = `image-${num}.jpg`; pzFullImg.src = `image-${num}.jpg`;
         tiles = [1, 2, 3, 4, 5, 6, 7, 8, null]; moveCount = 0; pzStats.innerText = "手数: 0";
         gameState = "PUZZLE_READY"; winRetryBtn.onclick = () => toPuzzle(num); drawPuzzle(); updateTimer(0);
     }
@@ -235,10 +219,10 @@
                     if (Math.abs(Math.floor(i/3)-Math.floor(e/3)) + Math.abs((i%3)-(e%3)) === 1) {
                         [tiles[i], tiles[e]] = [tiles[e], tiles[i]]; moveCount++; pzStats.innerText = "手数: " + moveCount; drawPuzzle();
                         if (tiles.every((v, idx) => v === (idx === 8 ? null : idx + 1))) {
-                            const finalS = Math.floor((Date.now() - startTime) / 1000);
+                            const finalS = Math.floor((Date.now() - startTime - totalPaused) / 1000);
                             resetEngine(); gameState = "WIN_PZL";
                             header.style.display = "none"; pzInfo.style.display = "none"; pzBoard.style.display = "none";
-                            pzClearLayer.style.display = "block";
+                            pzClearLayer.style.display = "block"; // パズル用クリア画像表示
                             winMsg.innerText = `クリア！手数: ${moveCount}回 / タイム: ${finalS}秒`;
                             cWin.style.display = "block"; pzControls.style.display = "none";
                         }
