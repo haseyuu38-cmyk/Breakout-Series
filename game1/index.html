@@ -2,36 +2,28 @@
 <html lang="ja">
 <head>
     <meta charset="utf-8" />
-    <title>ちっくゲーム - Final Complete</title>
+    <title>ちっくゲーム - Final Fix</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <style>
         body { margin: 0; padding: 0; background-color: #fce4ec; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; min-height: 100vh; touch-action: none; overflow: hidden; }
-        
         #game-header { width: 100%; height: 50px; display: none; justify-content: center; align-items: center; margin-top: 5px; }
         #timer-box { background: #ad1457; color: white; padding: 5px 25px; border-radius: 20px; font-weight: bold; font-size: 20px; }
-        
-        #puzzle-info-area { display: none; flex-direction: column; align-items: center; margin-top: 5px; width: 100%; }
-        #puzzle-sample-img { width: 70px; height: 70px; object-fit: cover; border: 2px solid #ad1457; border-radius: 8px; margin-bottom: 2px; }
-        #puzzle-stats { font-size: 16px; font-weight: bold; color: #ad1457; }
-
-        .content-frame { width: 95%; max-width: 480px; margin: 10px auto 0 auto; position: relative; border-radius: 10px; overflow: hidden; background: #fff; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        .content-frame { width: 95%; max-width: 480px; margin: 10px auto 0 auto; position: relative; box-shadow: 0 4px 15px rgba(0,0,0,0.1); border-radius: 10px; overflow: hidden; background: #fff; z-index: 10; }
         #portrait-frame { aspect-ratio: 2 / 3; display: block; }
         #landscape-frame { aspect-ratio: 3 / 2; display: none; }
         #puzzle-frame { aspect-ratio: 1 / 1; display: none; }
-        
         canvas { width: 100%; height: 100%; display: block; background: #fff; touch-action: none; }
         .full-asset { width: 100%; height: 100%; object-fit: cover; display: block; }
-
+        #puzzle-info-area { display: none; flex-direction: column; align-items: center; margin-top: 5px; width: 100%; }
+        #puzzle-sample-img { width: 70px; height: 70px; object-fit: cover; border: 2px solid #ad1457; border-radius: 8px; margin-bottom: 2px; }
+        #puzzle-stats { font-size: 16px; font-weight: bold; color: #ad1457; }
         #puzzle-board { display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 1fr); width: 100%; height: 100%; gap: 1px; background: #333; }
         .tile { width: 100%; height: 100%; background-image: url("image-3.jpg"); background-size: 300% 300%; background-repeat: no-repeat; }
         .empty { background: #eee !important; background-image: none !important; }
-        
         #clear-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: none; background: #fff; z-index: 20; }
         #clear-full-image { width: 100%; height: 100%; object-fit: contain; }
-
         .hit-area { position: absolute; cursor: pointer; z-index: 100; }
-
-        #ui-control-panel { width: 90%; max-width: 480px; text-align: center; padding-top: 5px; }
+        #ui-control-panel { width: 90%; max-width: 480px; text-align: center; padding-top: 5px; position: relative; z-index: 9999; }
         .action-btn { display: block; width: 100%; padding: 16px; margin: 10px 0; color: white; border: none; border-radius: 15px; font-size: 18px; font-weight: bold; cursor: pointer; -webkit-tap-highlight-color: transparent; }
         .btn-main { background: #ad1457; box-shadow: 0 4px 0 #78002e; }
         .btn-light { background: #f06292; box-shadow: 0 4px 0 #ad1457; }
@@ -43,7 +35,6 @@
 <body>
 
 <div id="game-header"><div id="timer-box">TIME: 00:00</div></div>
-
 <div id="puzzle-info-area">
     <img src="image-3.jpg" id="puzzle-sample-img">
     <div id="puzzle-stats">手数: 0</div>
@@ -101,16 +92,18 @@
     imgWin.src = 'Image.png'; imgMiss.src = 'Miss.png';
     let bricks = [], tiles = [1, 2, 3, 4, 5, 6, 7, 8, null], moveCount = 0;
 
-    function resetGameState() {
+    function stopProcesses() {
         if(animId) cancelAnimationFrame(animId);
         if(timerId) clearInterval(timerId);
         animId = null; timerId = null; isDragging = false; lastX = null;
     }
+
     function hideAll() {
-        resetGameState();
+        stopProcesses();
         pFrame.style.display = lFrame.style.display = pzFrame.style.display = pzInfo.style.display = cMiss.style.display = cWin.style.display = pzControls.style.display = header.style.display = "none";
         pzClearLayer.style.display = "none"; pzBoard.style.display = "grid";
     }
+
     function toSelect() { sTop.style.display = "none"; sSelect.style.display = "block"; gameState = "SELECT"; }
     function backToSelect() { hideAll(); pFrame.style.display = "block"; sSelect.style.display = "block"; gameState = "SELECT"; }
 
@@ -125,11 +118,16 @@
         bricks = [];
         for(let c=0; c<5; c++) { bricks[c] = []; for(let r=0; r<3; r++) { bricks[c][r] = { x: 0, y: 0, status: 1 }; } }
     }
+
+    /* 指示通り、ここだけ徹底修正：再開ロジック */
     function retryBreakout() {
-        resetGameState(); cMiss.style.display = "none";
+        if(animId) cancelAnimationFrame(animId); // 重複防止
+        cMiss.style.display = "none";
         if (pauseStart) totalPaused += (Date.now() - pauseStart);
+        pauseStart = null;
+        gameState = "PLAY_BRK";
         startTimer(false);
-        gameState = "PLAY_BRK"; drawBreakout();
+        drawBreakout(); // ループ再開
     }
 
     function drawBreakout() {
@@ -142,7 +140,7 @@
                 if(b.status === 1) {
                     let bx = (c * 85) + 30, by = (r * 30) + 30; b.x = bx; b.y = by;
                     ctx.fillStyle = "#f06292"; ctx.fillRect(bx, by, 75, 20);
-                    if(x > bx && x < bx + 75 && y > by && y < by + 20) { dy = -dy; b.status = 0; score++; if(score === 15) { gameState = "WIN_BRK"; resetGameState(); cWin.style.display = "block"; winMsg.innerText = ""; } }
+                    if(x > bx && x < bx + 75 && y > by && y < by + 20) { dy = -dy; b.status = 0; score++; if(score === 15) { gameState = "WIN_BRK"; stopProcesses(); cWin.style.display = "block"; winMsg.innerText = ""; } }
                 }
             }
         }
@@ -152,7 +150,13 @@
         if(y + dy < ballRadius) dy = -dy;
         else if(y + dy > canvas.height - ballRadius) {
             if(x > paddleX && x < paddleX + paddleWidth) dy = -Math.abs(dy);
-            else { gameState = "MISS_BRK"; resetGameState(); pauseStart = Date.now(); cMiss.style.display = "block"; return; }
+            else { 
+                gameState = "MISS_BRK"; 
+                if(timerId) clearInterval(timerId); timerId = null;
+                pauseStart = Date.now(); 
+                cMiss.style.display = "block"; 
+                return; 
+            }
         }
         x += dx * speedMultiplier; y += dy * speedMultiplier;
         animId = requestAnimationFrame(drawBreakout);
@@ -160,6 +164,7 @@
         else if (gameState === "WIN_BRK") ctx.drawImage(imgWin, 0, 0, 480, 320);
     }
 
+    /* 9パズル：演出・UI固定 */
     function toPuzzle() {
         hideAll(); pzFrame.style.display = "block"; pzInfo.style.display = "flex"; header.style.display = "flex"; pzControls.style.display = "block";
         document.getElementById("puzzle-start-btn").style.display = "block";
@@ -187,7 +192,7 @@
                         [tiles[i], tiles[e]] = [tiles[e], tiles[i]]; moveCount++; pzStats.innerText = "手数: " + moveCount; drawPuzzle();
                         if (tiles.every((v, idx) => v === (idx === 8 ? null : idx + 1))) {
                             const finalS = Math.floor((Date.now() - startTime) / 1000);
-                            resetGameState(); gameState = "WIN_PZL";
+                            stopProcesses(); gameState = "WIN_PZL";
                             header.style.display = "none"; pzInfo.style.display = "none"; pzBoard.style.display = "none";
                             pzClearLayer.style.display = "block";
                             winMsg.innerText = "クリア！手数: " + moveCount + "回 / タイム: " + finalS + "秒";
@@ -201,6 +206,7 @@
     }
 
     function startTimer(isNew) {
+        if(timerId) clearInterval(timerId);
         if(isNew) { startTime = Date.now(); totalPaused = 0; }
         timerId = setInterval(() => {
             let elapsed = Math.floor((Date.now() - startTime - totalPaused) / 1000);
@@ -209,7 +215,6 @@
     }
     function updateTimer(s) { timerBox.innerText = `TIME: ${Math.floor(s/60).toString().padStart(2,'0')}:${(s%60).toString().padStart(2,'0')}`; }
 
-    /* 操作系：相対移動・画面全体監視・ボタンガード */
     let lastX = null, isDragging = false;
     function handleMove(clientX) {
         if(gameState !== "PLAY_BRK") return;
@@ -222,17 +227,17 @@
         lastX = clientX;
     }
     window.addEventListener("mousedown", (e) => { 
-        if(e.target.tagName === 'BUTTON') return;
-        if(gameState === "PLAY_BRK") { isDragging = true; lastX = e.clientX; } 
+        if (e.target.tagName === 'BUTTON') return; 
+        if(gameState==="PLAY_BRK") { isDragging = true; lastX = e.clientX; } 
     });
-    window.addEventListener("mousemove", (e) => { if(isDragging) handleMove(e.clientX); });
+    window.addEventListener("mousemove", (e) => { if(isDragging && gameState==="PLAY_BRK") handleMove(e.clientX); });
     window.addEventListener("mouseup", () => { isDragging = false; lastX = null; });
     window.addEventListener("touchstart", (e) => { 
-        if(e.target.tagName === 'BUTTON') return;
-        if(gameState === "PLAY_BRK") { lastX = e.touches[0].clientX; } 
+        if (e.target.tagName === 'BUTTON') return; 
+        if(gameState==="PLAY_BRK") { lastX = e.touches[0].clientX; } 
     }, {passive: false});
     window.addEventListener("touchmove", (e) => { 
-        if(gameState === "PLAY_BRK" && !e.target.closest('#ui-control-panel')) { e.preventDefault(); handleMove(e.touches[0].clientX); } 
+        if(gameState==="PLAY_BRK") { e.preventDefault(); handleMove(e.touches[0].clientX); } 
     }, {passive: false});
     window.addEventListener("touchend", () => { lastX = null; });
 </script>
